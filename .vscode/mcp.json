@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "simple-task": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/barryvelasquez/projects/simple_task_mcp/mcp_server/build/index.js"
+      ]
+    }
+  }
+}

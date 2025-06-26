@@ -1,0 +1,32 @@
+{
+  "name": "simple-task-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for Simple Task project management",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev": "tsx src/index.ts",
+    "watch": "tsx watch src/index.ts",
+    "start:local": "./start-local.sh",
+    "start:production": "./start-production.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "dotenv": "^16.5.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/node-fetch": "^2.6.11",
+    "tsx": "^4.0.0",
+    "typescript": "^5.6.0"
+  },
+  "mcp": {
+    "server": {
+      "name": "simple-task-mcp-server",
+      "version": "1.0.0"
+    }
+  }
+}

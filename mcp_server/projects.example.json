@@ -1,0 +1,16 @@
+[
+  {
+    "name": "My Project Name",
+    "projectName": "my_project",
+    "apiKey": "st_proj_your_api_key_here",
+    "projectId": "your-project-id-here",
+    "description": "Description of your project (optional)"
+  },
+  {
+    "name": "Another Project",
+    "projectName": "another_project",
+    "apiKey": "st_proj_another_api_key_here",
+    "projectId": "another-project-id-here",
+    "description": "Another project description (optional)"
+  }
+]
