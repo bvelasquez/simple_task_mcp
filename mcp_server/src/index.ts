@@ -21,6 +21,131 @@ const simpleTaskService = SimpleTaskService.fromProjectsJson(
   path.join(__dirname, "..", "projects.json"),
 );
 
+// Session context for project management
+interface SessionContext {
+  currentProject?: string;
+  detectedFromWorkspace?: boolean;
+  lastWorkspaceDetection?: number;
+}
+
+const sessionContext: SessionContext = {};
+
+// Helper function to detect project from workspace
+async function detectProjectFromWorkspace(): Promise<string | null> {
+  try {
+    // Cache workspace detection for 5 minutes
+    const now = Date.now();
+    if (sessionContext.lastWorkspaceDetection && 
+        (now - sessionContext.lastWorkspaceDetection) < 5 * 60 * 1000 &&
+        sessionContext.currentProject) {
+      return sessionContext.currentProject;
+    }
+
+    // Try to find project.json in common locations
+    const fs = await import('fs');
+    const possiblePaths = [
+      './project.json',
+      '../project.json',
+      '../../project.json',
+      process.cwd() + '/project.json'
+    ];
+
+    for (const projectPath of possiblePaths) {
+      try {
+        if (fs.existsSync(projectPath)) {
+          const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+          if (projectData.name) {
+            // Try to match the project name to available Simple Task projects
+            const matchedProject = findProjectByName(projectData.name);
+            if (matchedProject) {
+              sessionContext.currentProject = matchedProject.projectName;
+              sessionContext.detectedFromWorkspace = true;
+              sessionContext.lastWorkspaceDetection = now;
+              console.log(`🔍 Auto-detected project: ${matchedProject.name} (${matchedProject.projectName})`);
+              return matchedProject.projectName;
+            }
+          }
+        }
+      } catch (error) {
+        // Ignore errors for individual files
+      }
+    }
+  } catch (error) {
+    // Ignore workspace detection errors
+  }
+  
+  return null;
+}
+
+// Helper function to find project by name (fuzzy matching)
+function findProjectByName(name: string): any | null {
+  const projects = simpleTaskService.getAllProjects();
+  const lowerName = name.toLowerCase();
+  
+  // Exact match first
+  for (const project of projects) {
+    if (project.name.toLowerCase() === lowerName || 
+        project.projectName.toLowerCase() === lowerName) {
+      return project;
+    }
+  }
+  
+  // Partial match
+  for (const project of projects) {
+    if (project.name.toLowerCase().includes(lowerName) || 
+        project.projectName.toLowerCase().includes(lowerName) ||
+        lowerName.includes(project.name.toLowerCase()) ||
+        lowerName.includes(project.projectName.toLowerCase())) {
+      return project;
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to resolve project for operations
+async function resolveProjectContext(explicitProjectName?: string): Promise<string | null> {
+  // 1. Use explicit project name if provided
+  if (explicitProjectName) {
+    return explicitProjectName;
+  }
+  
+  // 2. Use session context if available
+  if (sessionContext.currentProject) {
+    return sessionContext.currentProject;
+  }
+  
+  // 3. Try to auto-detect from workspace
+  const detected = await detectProjectFromWorkspace();
+  if (detected) {
+    return detected;
+  }
+  
+  // 4. Fall back to default project
+  const defaultProject = simpleTaskService.getAllProjects()[0];
+  return defaultProject?.projectName || null;
+}
+
+// Helper function to handle project switching
+function switchToProject(projectIdentifier: string): { success: boolean; message: string; project?: any } {
+  const project = findProjectByName(projectIdentifier);
+  if (project) {
+    sessionContext.currentProject = project.projectName;
+    sessionContext.detectedFromWorkspace = false;
+    console.log(`🔄 Switched to project: ${project.name} (${project.projectName})`);
+    return {
+      success: true,
+      message: `Switched to project: ${project.name} (${project.projectName})`,
+      project: project
+    };
+  } else {
+    return {
+      success: false,
+      message: `Project '${projectIdentifier}' not found. Available projects: ${simpleTaskService.getAllProjects().map(p => p.name).join(', ')}`
+    };
+  }
+}
+
 // Log project information for context
 const allProjects = simpleTaskService.getAllProjects();
 console.log(`📋 Loaded ${allProjects.length} project(s):`);
@@ -33,6 +158,15 @@ allProjects.forEach((project, index) => {
   );
 });
 console.log("");
+
+// Initialize workspace detection
+detectProjectFromWorkspace().then(detected => {
+  if (detected) {
+    console.log(`🎯 Using auto-detected project: ${detected}`);
+  } else {
+    console.log(`📌 Using default project: ${allProjects[0]?.name || 'none'}`);
+  }
+});
 
 const server = new Server(
   {
@@ -65,6 +199,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "simpletask_list_projects",
         description: "List all available Simple Task projects with details",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "simpletask_switch_project",
+        description:
+          "Switch to a different project for subsequent operations. This sets the session context so future task operations will default to this project.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_identifier: {
+              type: "string",
+              description:
+                "Project name or identifier to switch to (can be partial match)",
+            },
+          },
+          required: ["project_identifier"],
+        },
+      },
+      {
+        name: "simpletask_get_current_project",
+        description: "Get the currently active project in the session context",
         inputSchema: {
           type: "object",
           properties: {},
@@ -643,6 +801,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Simple Task Management Tools
       case "simpletask_list_projects":
         return await handleSimpleTaskListProjects();
+      case "simpletask_switch_project":
+        return await handleSimpleTaskSwitchProject(args);
+      case "simpletask_get_current_project":
+        return await handleSimpleTaskGetCurrentProject();
       case "simpletask_find_project":
         return await handleSimpleTaskFindProject(args);
       case "simpletask_get_project_details":
@@ -838,7 +1000,28 @@ async function handleSimpleTaskGetProjectDetails(args: any) {
 async function handleSimpleTaskCreateTask(args: any) {
   try {
     const { project_name, ...taskData } = args;
-    const result = await simpleTaskService.createTask(taskData, project_name);
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const result = await simpleTaskService.createTask(
+      taskData,
+      resolvedProject,
+    );
+
+    // Log the project used for context
+    console.log(`📝 Created task in project: ${resolvedProject}`);
+
     return {
       content: [
         {
@@ -865,7 +1048,25 @@ async function handleSimpleTaskCreateTask(args: any) {
 async function handleSimpleTaskGetTasks(args: any) {
   try {
     const { project_name } = args || {};
-    const result = await simpleTaskService.getTasks(project_name);
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const result = await simpleTaskService.getTasks(resolvedProject);
+
+    // Log the project used for context
+    console.log(`📋 Retrieved tasks from project: ${resolvedProject}`);
+
     return {
       content: [
         {
@@ -1185,10 +1386,28 @@ async function handleSimpleTaskGetTaskDependents(args: any) {
 async function handleSimpleTaskGenerateTasks(args: any) {
   try {
     const { description, project_name } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const result = await simpleTaskService.generateTasks(
       description,
-      project_name,
+      resolvedProject,
     );
+
+    // Log the project used for context
+    console.log(`🤖 Generated tasks for project: ${resolvedProject}`);
+
     return {
       content: [
         {
@@ -1465,6 +1684,109 @@ async function handleSimpleTaskGetProjectComments(args: any) {
         {
           type: "text",
           text: `Failed to get project comments: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+async function handleSimpleTaskSwitchProject(args: any) {
+  try {
+    const { project_identifier } = args;
+    const result = switchToProject(project_identifier);
+
+    if (result.success) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✅ ${
+              result.message
+            }\n\n**Current Project Details:**\n${JSON.stringify(
+              result.project,
+              null,
+              2,
+            )}`,
+          },
+        ],
+      };
+    } else {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ ${result.message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Failed to switch project: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+async function handleSimpleTaskGetCurrentProject() {
+  try {
+    const currentProject = await resolveProjectContext();
+    const projectDetails = currentProject
+      ? simpleTaskService.getProjectDetails(currentProject)
+      : null;
+
+    let statusMessage = "";
+    if (sessionContext.detectedFromWorkspace) {
+      statusMessage = "🔍 Auto-detected from workspace project.json";
+    } else if (sessionContext.currentProject) {
+      statusMessage = "🎯 Manually selected via session context";
+    } else {
+      statusMessage = "📌 Using default project";
+    }
+
+    if (projectDetails) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `# Current Active Project\n\n**${projectDetails.name}** (${
+              projectDetails.projectName
+            })\n\n**Status:** ${statusMessage}\n**Project ID:** ${
+              projectDetails.projectId
+            }\n**Description:** ${
+              projectDetails.description || "No description"
+            }\n\n## Full Data:\n\n${JSON.stringify(projectDetails, null, 2)}`,
+          },
+        ],
+      };
+    } else {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No current project found. Use `simpletask_switch_project` to select a project or `simpletask_list_projects` to see available options.",
+          },
+        ],
+        isError: true,
+      };
+    }
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Failed to get current project: ${
             error instanceof Error ? error.message : String(error)
           }`,
         },
