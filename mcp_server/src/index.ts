@@ -470,6 +470,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               enum: ["low", "medium", "high"],
               description: "Priority to filter by",
             },
+            project_name: {
+              type: "string",
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
           },
           required: ["priority"],
         },
@@ -483,6 +488,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             order_key: {
               type: "string",
               description: "Order key to filter by (e.g., 'h', 'za', 'zb')",
+            },
+            project_name: {
+              type: "string",
+              description:
+                "Project name (optional, uses default if not specified)",
             },
           },
           required: ["order_key"],
@@ -498,6 +508,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "ID of the task to get dependencies for",
             },
+            project_name: {
+              type: "string",
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
           },
           required: ["task_id"],
         },
@@ -511,6 +526,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             task_id: {
               type: "string",
               description: "ID of the task to get dependents for",
+            },
+            project_name: {
+              type: "string",
+              description:
+                "Project name (optional, uses default if not specified)",
             },
           },
           required: ["task_id"],
@@ -651,6 +671,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "ID of the user updating the comment",
             },
+            task_id: {
+              type: "string",
+              description:
+                "ID of the task containing the comment (optional but recommended)",
+            },
           },
           required: ["comment_id", "content", "user_id"],
         },
@@ -669,6 +694,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "ID of the user deleting the comment",
             },
+            task_id: {
+              type: "string",
+              description:
+                "ID of the task containing the comment (optional but recommended)",
+            },
           },
           required: ["comment_id", "user_id"],
         },
@@ -682,6 +712,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             comment_id: {
               type: "string",
               description: "ID of the comment to retrieve",
+            },
+            task_id: {
+              type: "string",
+              description:
+                "ID of the task containing the comment (optional but recommended)",
             },
           },
           required: ["comment_id"],
@@ -705,8 +740,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "ID of the user creating the reply",
             },
+            task_id: {
+              type: "string",
+              description:
+                "ID of the task containing the comment (required for creating replies)",
+            },
           },
-          required: ["parent_comment_id", "content", "user_id"],
+          required: ["parent_comment_id", "content", "user_id", "task_id"],
         },
       },
       {
@@ -1093,7 +1133,25 @@ async function handleSimpleTaskGetTasks(args: any) {
 async function handleSimpleTaskGetTask(args: any) {
   try {
     const { task_id, project_name } = args;
-    const result = await simpleTaskService.getTask(task_id, project_name);
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const result = await simpleTaskService.getTask(task_id, resolvedProject);
+
+    // Log the project used for context
+    console.log(`📄 Retrieved task from project: ${resolvedProject}`);
+
     return {
       content: [
         {
@@ -1120,11 +1178,29 @@ async function handleSimpleTaskGetTask(args: any) {
 async function handleSimpleTaskUpdateTask(args: any) {
   try {
     const { task_id, project_name, ...updateData } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const result = await simpleTaskService.updateTask(
       task_id,
       updateData,
-      project_name,
+      resolvedProject,
     );
+
+    // Log the project used for context
+    console.log(`✏️ Updated task in project: ${resolvedProject}`);
+
     return {
       content: [
         {
@@ -1151,11 +1227,29 @@ async function handleSimpleTaskUpdateTask(args: any) {
 async function handleSimpleTaskUpdateTaskStatus(args: any) {
   try {
     const { task_id, status, project_name } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const result = await simpleTaskService.updateTaskStatus(
       task_id,
       status,
-      project_name,
+      resolvedProject,
     );
+
+    // Log the project used for context
+    console.log(`🔄 Updated task status in project: ${resolvedProject}`);
+
     return {
       content: [
         {
@@ -1182,7 +1276,25 @@ async function handleSimpleTaskUpdateTaskStatus(args: any) {
 async function handleSimpleTaskDeleteTask(args: any) {
   try {
     const { task_id, project_name } = args;
-    const result = await simpleTaskService.deleteTask(task_id, project_name);
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const result = await simpleTaskService.deleteTask(task_id, resolvedProject);
+
+    // Log the project used for context
+    console.log(`🗑️ Deleted task from project: ${resolvedProject}`);
+
     return {
       content: [
         {
@@ -1209,7 +1321,25 @@ async function handleSimpleTaskDeleteTask(args: any) {
 async function handleSimpleTaskSearchTasks(args: any) {
   try {
     const { query, project_name } = args;
-    const result = await simpleTaskService.searchTasks(query, project_name);
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const result = await simpleTaskService.searchTasks(query, resolvedProject);
+
+    // Log the project used for context
+    console.log(`🔍 Searched tasks in project: ${resolvedProject}`);
+
     return {
       content: [
         {
@@ -1236,10 +1366,30 @@ async function handleSimpleTaskSearchTasks(args: any) {
 async function handleSimpleTaskGetTasksByStatus(args: any) {
   try {
     const { status, project_name } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const result = await simpleTaskService.getTasksByStatus(
       status,
-      project_name,
+      resolvedProject,
     );
+
+    // Log the project used for context
+    console.log(
+      `📊 Retrieved tasks by status from project: ${resolvedProject}`,
+    );
+
     return {
       content: [
         {
@@ -1266,10 +1416,30 @@ async function handleSimpleTaskGetTasksByStatus(args: any) {
 async function handleSimpleTaskGetTasksByPriority(args: any) {
   try {
     const { priority, project_name } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const result = await simpleTaskService.getTasksByPriority(
       priority,
-      project_name,
+      resolvedProject,
     );
+
+    // Log the project used for context
+    console.log(
+      `🔢 Retrieved tasks by priority from project: ${resolvedProject}`,
+    );
+
     return {
       content: [
         {
@@ -1296,10 +1466,30 @@ async function handleSimpleTaskGetTasksByPriority(args: any) {
 async function handleSimpleTaskGetTasksByOrderKey(args: any) {
   try {
     const { order_key, project_name } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const result = await simpleTaskService.getTasksByOrderKey(
       order_key,
-      project_name,
+      resolvedProject,
     );
+
+    // Log the project used for context
+    console.log(
+      `📝 Retrieved tasks by order key from project: ${resolvedProject}`,
+    );
+
     return {
       content: [
         {
@@ -1326,10 +1516,30 @@ async function handleSimpleTaskGetTasksByOrderKey(args: any) {
 async function handleSimpleTaskGetTaskDependencies(args: any) {
   try {
     const { task_id, project_name } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const result = await simpleTaskService.getTaskDependencies(
       task_id,
-      project_name,
+      resolvedProject,
     );
+
+    // Log the project used for context
+    console.log(
+      `🔗 Retrieved task dependencies from project: ${resolvedProject}`,
+    );
+
     return {
       content: [
         {
@@ -1356,10 +1566,30 @@ async function handleSimpleTaskGetTaskDependencies(args: any) {
 async function handleSimpleTaskGetTaskDependents(args: any) {
   try {
     const { task_id, project_name } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const result = await simpleTaskService.getTaskDependents(
       task_id,
-      project_name,
+      resolvedProject,
     );
+
+    // Log the project used for context
+    console.log(
+      `🔗 Retrieved task dependents from project: ${resolvedProject}`,
+    );
+
     return {
       content: [
         {
@@ -1518,11 +1748,12 @@ async function handleSimpleTaskGetTaskComments(args: any) {
 
 async function handleSimpleTaskUpdateComment(args: any) {
   try {
-    const { comment_id, content, user_id } = args;
+    const { comment_id, content, user_id, task_id } = args;
     const result = await simpleTaskService.updateComment(
       comment_id,
       content,
       user_id,
+      task_id,
     );
     return {
       content: [
@@ -1549,8 +1780,12 @@ async function handleSimpleTaskUpdateComment(args: any) {
 
 async function handleSimpleTaskDeleteComment(args: any) {
   try {
-    const { comment_id, user_id } = args;
-    const result = await simpleTaskService.deleteComment(comment_id, user_id);
+    const { comment_id, user_id, task_id } = args;
+    const result = await simpleTaskService.deleteComment(
+      comment_id,
+      user_id,
+      task_id,
+    );
     return {
       content: [
         {
@@ -1576,8 +1811,8 @@ async function handleSimpleTaskDeleteComment(args: any) {
 
 async function handleSimpleTaskGetComment(args: any) {
   try {
-    const { comment_id } = args;
-    const result = await simpleTaskService.getComment(comment_id);
+    const { comment_id, task_id } = args;
+    const result = await simpleTaskService.getComment(comment_id, task_id);
     return {
       content: [
         {
@@ -1603,11 +1838,12 @@ async function handleSimpleTaskGetComment(args: any) {
 
 async function handleSimpleTaskReplyToComment(args: any) {
   try {
-    const { parent_comment_id, content, user_id } = args;
+    const { parent_comment_id, content, user_id, task_id } = args;
     const result = await simpleTaskService.replyToComment(
       parent_comment_id,
       content,
       user_id,
+      task_id,
     );
     return {
       content: [

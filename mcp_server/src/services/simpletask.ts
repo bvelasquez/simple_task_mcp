@@ -416,7 +416,11 @@ export class SimpleTaskService {
     parent_comment_id?: string;
     user_id: string;
   }): Promise<any> {
-    return this.makeRequest(`/tasks/${args.task_id}/comments`, "POST", args);
+    return this.makeRequest(
+      `/projects/${this.config.projectId}/tasks/${args.task_id}/comments`,
+      "POST",
+      args,
+    );
   }
 
   async getTaskComments(
@@ -428,43 +432,102 @@ export class SimpleTaskService {
       user_id,
       ...options,
     });
-    return this.makeRequest(`/tasks/${task_id}/comments?${queryParams}`, "GET");
+    return this.makeRequest(
+      `/projects/${this.config.projectId}/tasks/${task_id}/comments?${queryParams}`,
+      "GET",
+    );
   }
 
   async updateComment(
     comment_id: string,
     content: string,
     user_id: string,
+    task_id?: string,
   ): Promise<any> {
-    return this.makeRequest(`/comments/${comment_id}`, "PUT", {
-      content,
-      user_id,
-    });
+    // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
+    if (task_id) {
+      return this.makeRequest(
+        `/projects/${this.config.projectId}/tasks/${task_id}/comments/${comment_id}`,
+        "PUT",
+        {
+          content,
+          user_id,
+        },
+      );
+    } else {
+      return this.makeRequest(
+        `/projects/${this.config.projectId}/comments/${comment_id}`,
+        "PUT",
+        {
+          content,
+          user_id,
+        },
+      );
+    }
   }
 
-  async deleteComment(comment_id: string, user_id: string): Promise<any> {
-    return this.makeRequest(`/comments/${comment_id}`, "DELETE", { user_id });
+  async deleteComment(
+    comment_id: string,
+    user_id: string,
+    task_id?: string,
+  ): Promise<any> {
+    // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
+    if (task_id) {
+      return this.makeRequest(
+        `/projects/${this.config.projectId}/tasks/${task_id}/comments/${comment_id}`,
+        "DELETE",
+        { user_id },
+      );
+    } else {
+      return this.makeRequest(
+        `/projects/${this.config.projectId}/comments/${comment_id}`,
+        "DELETE",
+        { user_id },
+      );
+    }
   }
 
-  async getComment(comment_id: string): Promise<any> {
-    return this.makeRequest(`/comments/${comment_id}`, "GET");
+  async getComment(comment_id: string, task_id?: string): Promise<any> {
+    // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
+    if (task_id) {
+      return this.makeRequest(
+        `/projects/${this.config.projectId}/tasks/${task_id}/comments/${comment_id}`,
+        "GET",
+      );
+    } else {
+      return this.makeRequest(
+        `/projects/${this.config.projectId}/comments/${comment_id}`,
+        "GET",
+      );
+    }
   }
 
   async replyToComment(
     parent_comment_id: string,
     content: string,
     user_id: string,
+    task_id?: string,
   ): Promise<any> {
-    return this.makeRequest(`/comments/${parent_comment_id}/replies`, "POST", {
-      content,
-      user_id,
-    });
+    // Replies are created using the same endpoint as regular comments, but with parent_comment_id
+    // We need task_id to construct the proper endpoint
+    if (!task_id) {
+      throw new Error("task_id is required for creating comment replies");
+    }
+    return this.makeRequest(
+      `/projects/${this.config.projectId}/tasks/${task_id}/comments`,
+      "POST",
+      {
+        content,
+        user_id,
+        parent_comment_id,
+      },
+    );
   }
 
   async getCommentThread(comment_id: string, user_id: string): Promise<any> {
     const queryParams = new URLSearchParams({ user_id });
     return this.makeRequest(
-      `/comments/${comment_id}/thread?${queryParams}`,
+      `/projects/${this.config.projectId}/comments/${comment_id}/thread?${queryParams}`,
       "GET",
     );
   }
