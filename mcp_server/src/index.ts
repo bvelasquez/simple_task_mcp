@@ -425,6 +425,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "ID of the task to delete",
             },
+            project_name: {
+              type: "string",
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
           },
           required: ["task_id"],
         },
@@ -440,6 +445,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 "Search term to look for in task titles and descriptions",
             },
+            project_name: {
+              type: "string",
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
           },
           required: ["query"],
         },
@@ -454,6 +464,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               enum: ["todo", "in_progress", "review", "completed", "blocked"],
               description: "Status to filter by",
+            },
+            project_name: {
+              type: "string",
+              description:
+                "Project name (optional, uses default if not specified)",
             },
           },
           required: ["status"],
@@ -1691,7 +1706,11 @@ async function handleSimpleTaskGetProjectInfo(args: any) {
 // Comment handler functions (using SimpleTaskService methods)
 async function handleSimpleTaskCreateComment(args: any) {
   try {
-    const result = await simpleTaskService.createComment(args);
+    const resolvedProject = await resolveProjectContext();
+    const result = await simpleTaskService.createComment(
+      args,
+      resolvedProject || undefined,
+    );
     return {
       content: [
         {
@@ -1718,10 +1737,12 @@ async function handleSimpleTaskCreateComment(args: any) {
 async function handleSimpleTaskGetTaskComments(args: any) {
   try {
     const { task_id, user_id, ...options } = args;
+    const resolvedProject = await resolveProjectContext();
     const result = await simpleTaskService.getTaskComments(
       task_id,
       user_id,
       options,
+      resolvedProject || undefined,
     );
     return {
       content: [
@@ -1749,11 +1770,13 @@ async function handleSimpleTaskGetTaskComments(args: any) {
 async function handleSimpleTaskUpdateComment(args: any) {
   try {
     const { comment_id, content, user_id, task_id } = args;
+    const resolvedProject = await resolveProjectContext();
     const result = await simpleTaskService.updateComment(
       comment_id,
       content,
       user_id,
       task_id,
+      resolvedProject || undefined,
     );
     return {
       content: [
@@ -1781,10 +1804,12 @@ async function handleSimpleTaskUpdateComment(args: any) {
 async function handleSimpleTaskDeleteComment(args: any) {
   try {
     const { comment_id, user_id, task_id } = args;
+    const resolvedProject = await resolveProjectContext();
     const result = await simpleTaskService.deleteComment(
       comment_id,
       user_id,
       task_id,
+      resolvedProject || undefined,
     );
     return {
       content: [
@@ -1812,7 +1837,12 @@ async function handleSimpleTaskDeleteComment(args: any) {
 async function handleSimpleTaskGetComment(args: any) {
   try {
     const { comment_id, task_id } = args;
-    const result = await simpleTaskService.getComment(comment_id, task_id);
+    const resolvedProject = await resolveProjectContext();
+    const result = await simpleTaskService.getComment(
+      comment_id,
+      task_id,
+      resolvedProject || undefined,
+    );
     return {
       content: [
         {
@@ -1839,11 +1869,13 @@ async function handleSimpleTaskGetComment(args: any) {
 async function handleSimpleTaskReplyToComment(args: any) {
   try {
     const { parent_comment_id, content, user_id, task_id } = args;
+    const resolvedProject = await resolveProjectContext();
     const result = await simpleTaskService.replyToComment(
       parent_comment_id,
       content,
       user_id,
       task_id,
+      resolvedProject || undefined,
     );
     return {
       content: [
@@ -1871,9 +1903,11 @@ async function handleSimpleTaskReplyToComment(args: any) {
 async function handleSimpleTaskGetCommentThread(args: any) {
   try {
     const { comment_id, user_id } = args;
+    const resolvedProject = await resolveProjectContext();
     const result = await simpleTaskService.getCommentThread(
       comment_id,
       user_id,
+      resolvedProject || undefined,
     );
     return {
       content: [
@@ -1901,10 +1935,12 @@ async function handleSimpleTaskGetCommentThread(args: any) {
 async function handleSimpleTaskGetProjectComments(args: any) {
   try {
     const { project_id, user_id, ...options } = args;
+    const resolvedProject = await resolveProjectContext();
     const result = await simpleTaskService.getProjectComments(
       project_id,
       user_id,
       options,
+      resolvedProject || undefined,
     );
     return {
       content: [

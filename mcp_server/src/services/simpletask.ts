@@ -410,16 +410,21 @@ export class SimpleTaskService {
   }
 
   // Comment methods
-  async createComment(args: {
-    task_id: string;
-    content: string;
-    parent_comment_id?: string;
-    user_id: string;
-  }): Promise<any> {
+  async createComment(
+    args: {
+      task_id: string;
+      content: string;
+      parent_comment_id?: string;
+      user_id: string;
+    },
+    projectName?: string,
+  ): Promise<any> {
+    const projectConfig = this.getProjectConfig(projectName);
     return this.makeRequest(
-      `/projects/${this.config.projectId}/tasks/${args.task_id}/comments`,
+      `/projects/${projectConfig.projectId}/tasks/${args.task_id}/comments`,
       "POST",
       args,
+      projectName,
     );
   }
 
@@ -427,14 +432,18 @@ export class SimpleTaskService {
     task_id: string,
     user_id: string,
     options: any = {},
+    projectName?: string,
   ): Promise<any> {
+    const projectConfig = this.getProjectConfig(projectName);
     const queryParams = new URLSearchParams({
       user_id,
       ...options,
     });
     return this.makeRequest(
-      `/projects/${this.config.projectId}/tasks/${task_id}/comments?${queryParams}`,
+      `/projects/${projectConfig.projectId}/tasks/${task_id}/comments?${queryParams}`,
       "GET",
+      undefined,
+      projectName,
     );
   }
 
@@ -443,25 +452,29 @@ export class SimpleTaskService {
     content: string,
     user_id: string,
     task_id?: string,
+    projectName?: string,
   ): Promise<any> {
+    const projectConfig = this.getProjectConfig(projectName);
     // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
     if (task_id) {
       return this.makeRequest(
-        `/projects/${this.config.projectId}/tasks/${task_id}/comments/${comment_id}`,
+        `/projects/${projectConfig.projectId}/tasks/${task_id}/comments/${comment_id}`,
         "PUT",
         {
           content,
           user_id,
         },
+        projectName,
       );
     } else {
       return this.makeRequest(
-        `/projects/${this.config.projectId}/comments/${comment_id}`,
+        `/projects/${projectConfig.projectId}/comments/${comment_id}`,
         "PUT",
         {
           content,
           user_id,
         },
+        projectName,
       );
     }
   }
@@ -470,34 +483,47 @@ export class SimpleTaskService {
     comment_id: string,
     user_id: string,
     task_id?: string,
+    projectName?: string,
   ): Promise<any> {
+    const projectConfig = this.getProjectConfig(projectName);
     // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
     if (task_id) {
       return this.makeRequest(
-        `/projects/${this.config.projectId}/tasks/${task_id}/comments/${comment_id}`,
+        `/projects/${projectConfig.projectId}/tasks/${task_id}/comments/${comment_id}`,
         "DELETE",
         { user_id },
+        projectName,
       );
     } else {
       return this.makeRequest(
-        `/projects/${this.config.projectId}/comments/${comment_id}`,
+        `/projects/${projectConfig.projectId}/comments/${comment_id}`,
         "DELETE",
         { user_id },
+        projectName,
       );
     }
   }
 
-  async getComment(comment_id: string, task_id?: string): Promise<any> {
+  async getComment(
+    comment_id: string,
+    task_id?: string,
+    projectName?: string,
+  ): Promise<any> {
+    const projectConfig = this.getProjectConfig(projectName);
     // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
     if (task_id) {
       return this.makeRequest(
-        `/projects/${this.config.projectId}/tasks/${task_id}/comments/${comment_id}`,
+        `/projects/${projectConfig.projectId}/tasks/${task_id}/comments/${comment_id}`,
         "GET",
+        undefined,
+        projectName,
       );
     } else {
       return this.makeRequest(
-        `/projects/${this.config.projectId}/comments/${comment_id}`,
+        `/projects/${projectConfig.projectId}/comments/${comment_id}`,
         "GET",
+        undefined,
+        projectName,
       );
     }
   }
@@ -507,28 +533,38 @@ export class SimpleTaskService {
     content: string,
     user_id: string,
     task_id?: string,
+    projectName?: string,
   ): Promise<any> {
+    const projectConfig = this.getProjectConfig(projectName);
     // Replies are created using the same endpoint as regular comments, but with parent_comment_id
     // We need task_id to construct the proper endpoint
     if (!task_id) {
       throw new Error("task_id is required for creating comment replies");
     }
     return this.makeRequest(
-      `/projects/${this.config.projectId}/tasks/${task_id}/comments`,
+      `/projects/${projectConfig.projectId}/tasks/${task_id}/comments`,
       "POST",
       {
         content,
         user_id,
         parent_comment_id,
       },
+      projectName,
     );
   }
 
-  async getCommentThread(comment_id: string, user_id: string): Promise<any> {
+  async getCommentThread(
+    comment_id: string,
+    user_id: string,
+    projectName?: string,
+  ): Promise<any> {
+    const projectConfig = this.getProjectConfig(projectName);
     const queryParams = new URLSearchParams({ user_id });
     return this.makeRequest(
-      `/projects/${this.config.projectId}/comments/${comment_id}/thread?${queryParams}`,
+      `/projects/${projectConfig.projectId}/comments/${comment_id}/thread?${queryParams}`,
       "GET",
+      undefined,
+      projectName,
     );
   }
 
@@ -536,14 +572,20 @@ export class SimpleTaskService {
     project_id: string,
     user_id: string,
     options: any = {},
+    projectName?: string,
   ): Promise<any> {
+    const projectConfig = this.getProjectConfig(projectName);
     const queryParams = new URLSearchParams({
       user_id,
       ...options,
     });
+    // Use the provided project_id directly instead of getting it from config
+    // This method allows querying comments from a specific project by ID
     return this.makeRequest(
       `/projects/${project_id}/comments?${queryParams}`,
       "GET",
+      undefined,
+      projectName,
     );
   }
 }
