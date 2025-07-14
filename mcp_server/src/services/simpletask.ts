@@ -46,6 +46,7 @@ export interface TaskSearchResult {
   depends_on: string[];
   due_date: string | null;
   assigned_to: string | null;
+  created_by: string;
   created_at: string;
   updated_at: string;
 }
@@ -220,10 +221,21 @@ export class SimpleTaskService {
 
   // Create a new task
   async createTask(
-    task: Task,
+    task: Task & { created_by?: string }, // Allow created_by to be provided
     projectName?: string,
   ): Promise<TaskSearchResult> {
     const projectConfig = this.getProjectConfig(projectName);
+    
+    // If created_by not provided, try to get a default user_id from existing tasks
+    if (!task.created_by) {
+      try {
+        task.created_by = await this.getDefaultUserId(projectName);
+      } catch (error) {
+        // If we can't get a default user_id, let the API handle it
+        console.warn(`Could not resolve default user_id for task creation: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    
     const result = await this.makeRequest(
       `/projects/${projectConfig.projectId}/tasks`,
       "POST",
@@ -409,34 +421,91 @@ export class SimpleTaskService {
     return projectNames;
   }
 
+  // Helper method to get user_id from task creator
+  private async getTaskCreatorUserId(
+    taskId: string,
+    projectName?: string,
+  ): Promise<string> {
+    try {
+      const task = await this.getTask(taskId, projectName);
+      if (!task.created_by) {
+        throw new Error(`Task ${taskId} does not have a created_by field`);
+      }
+      return task.created_by;
+    } catch (error) {
+      throw new Error(
+        `Failed to get task creator for task ${taskId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  // Helper method to get a default user_id from any existing task in the project
+  private async getDefaultUserId(projectName?: string): Promise<string> {
+    try {
+      const tasks = await this.getTasks(projectName);
+      if (tasks.length === 0) {
+        throw new Error("No tasks found in project to determine default user_id");
+      }
+      
+      // Use the created_by from the first task as default
+      const defaultUserId = tasks[0].created_by;
+      if (!defaultUserId) {
+        throw new Error("Found tasks but no created_by field");
+      }
+      
+      return defaultUserId;
+    } catch (error) {
+      throw new Error(
+        `Failed to get default user_id: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
   // Comment methods
   async createComment(
     args: {
       task_id: string;
       content: string;
       parent_comment_id?: string;
-      user_id: string;
+      user_id?: string; // Made optional - will be resolved from task creator
     },
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
+    
+    // If user_id not provided, get it from the task creator
+    const user_id = args.user_id || await this.getTaskCreatorUserId(args.task_id, projectName);
+    
+    const commentArgs = {
+      ...args,
+      user_id,
+    };
+    
     return this.makeRequest(
       `/projects/${projectConfig.projectId}/tasks/${args.task_id}/comments`,
       "POST",
-      args,
+      commentArgs,
       projectName,
     );
   }
 
   async getTaskComments(
     task_id: string,
-    user_id: string,
+    user_id?: string, // Made optional - will be resolved from task creator
     options: any = {},
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
+    
+    // If user_id not provided, get it from the task creator
+    const resolvedUserId = user_id || await this.getTaskCreatorUserId(task_id, projectName);
+    
     const queryParams = new URLSearchParams({
-      user_id,
+      user_id: resolvedUserId,
       ...options,
     });
     return this.makeRequest(
@@ -450,11 +519,19 @@ export class SimpleTaskService {
   async updateComment(
     comment_id: string,
     content: string,
-    user_id: string,
+    user_id?: string, // Made optional - will be resolved from task creator if task_id provided
     task_id?: string,
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
+    
+    // If user_id not provided and we have task_id, get it from the task creator
+    const resolvedUserId = user_id || (task_id ? await this.getTaskCreatorUserId(task_id, projectName) : undefined);
+    
+    if (!resolvedUserId) {
+      throw new Error("user_id is required when task_id is not provided");
+    }
+    
     // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
     if (task_id) {
       return this.makeRequest(
@@ -462,7 +539,7 @@ export class SimpleTaskService {
         "PUT",
         {
           content,
-          user_id,
+          user_id: resolvedUserId,
         },
         projectName,
       );
@@ -472,7 +549,7 @@ export class SimpleTaskService {
         "PUT",
         {
           content,
-          user_id,
+          user_id: resolvedUserId,
         },
         projectName,
       );
@@ -481,24 +558,32 @@ export class SimpleTaskService {
 
   async deleteComment(
     comment_id: string,
-    user_id: string,
+    user_id?: string, // Made optional - will be resolved from task creator if task_id provided
     task_id?: string,
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
+    
+    // If user_id not provided and we have task_id, get it from the task creator
+    const resolvedUserId = user_id || (task_id ? await this.getTaskCreatorUserId(task_id, projectName) : undefined);
+    
+    if (!resolvedUserId) {
+      throw new Error("user_id is required when task_id is not provided");
+    }
+    
     // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
     if (task_id) {
       return this.makeRequest(
         `/projects/${projectConfig.projectId}/tasks/${task_id}/comments/${comment_id}`,
         "DELETE",
-        { user_id },
+        { user_id: resolvedUserId },
         projectName,
       );
     } else {
       return this.makeRequest(
         `/projects/${projectConfig.projectId}/comments/${comment_id}`,
         "DELETE",
-        { user_id },
+        { user_id: resolvedUserId },
         projectName,
       );
     }
@@ -531,8 +616,8 @@ export class SimpleTaskService {
   async replyToComment(
     parent_comment_id: string,
     content: string,
-    user_id: string,
-    task_id?: string,
+    user_id?: string, // Made optional - will be resolved from task creator
+    task_id?: string, // Made optional but recommended for performance
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
@@ -541,12 +626,16 @@ export class SimpleTaskService {
     if (!task_id) {
       throw new Error("task_id is required for creating comment replies");
     }
+    
+    // If user_id not provided, get it from the task creator
+    const resolvedUserId = user_id || await this.getTaskCreatorUserId(task_id, projectName);
+    
     return this.makeRequest(
       `/projects/${projectConfig.projectId}/tasks/${task_id}/comments`,
       "POST",
       {
         content,
-        user_id,
+        user_id: resolvedUserId,
         parent_comment_id,
       },
       projectName,
@@ -555,11 +644,15 @@ export class SimpleTaskService {
 
   async getCommentThread(
     comment_id: string,
-    user_id: string,
+    user_id?: string, // Made optional - will use default user if not provided
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
-    const queryParams = new URLSearchParams({ user_id });
+    
+    // If user_id not provided, get a default user_id
+    const resolvedUserId = user_id || await this.getDefaultUserId(projectName);
+    
+    const queryParams = new URLSearchParams({ user_id: resolvedUserId });
     return this.makeRequest(
       `/projects/${projectConfig.projectId}/comments/${comment_id}/thread?${queryParams}`,
       "GET",
@@ -570,13 +663,17 @@ export class SimpleTaskService {
 
   async getProjectComments(
     project_id: string,
-    user_id: string,
+    user_id?: string, // Made optional - will use default user if not provided
     options: any = {},
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
+    
+    // If user_id not provided, get a default user_id
+    const resolvedUserId = user_id || await this.getDefaultUserId(projectName);
+    
     const queryParams = new URLSearchParams({
-      user_id,
+      user_id: resolvedUserId,
       ...options,
     });
     // Use the provided project_id directly instead of getting it from config

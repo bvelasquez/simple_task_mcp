@@ -612,10 +612,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user creating the comment",
+              description: "ID of the user creating the comment (optional, will use task creator if not provided)",
             },
           },
-          required: ["task_id", "content", "user_id"],
+          required: ["task_id", "content"],
         },
       },
       {
@@ -630,7 +630,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user requesting comments",
+              description: "ID of the user requesting comments (optional, will use task creator if not provided)",
             },
             include_deleted: {
               type: "boolean",
@@ -665,7 +665,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               default: 0,
             },
           },
-          required: ["task_id", "user_id"],
+          required: ["task_id"],
         },
       },
       {
@@ -684,7 +684,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user updating the comment",
+              description: "ID of the user updating the comment (optional, will use task creator if task_id provided)",
             },
             task_id: {
               type: "string",
@@ -692,7 +692,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 "ID of the task containing the comment (optional but recommended)",
             },
           },
-          required: ["comment_id", "content", "user_id"],
+          required: ["comment_id", "content"],
         },
       },
       {
@@ -707,7 +707,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user deleting the comment",
+              description: "ID of the user deleting the comment (optional, will use task creator if task_id provided)",
             },
             task_id: {
               type: "string",
@@ -715,7 +715,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 "ID of the task containing the comment (optional but recommended)",
             },
           },
-          required: ["comment_id", "user_id"],
+          required: ["comment_id"],
         },
       },
       {
@@ -753,7 +753,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user creating the reply",
+              description: "ID of the user creating the reply (optional, will use task creator if not provided)",
             },
             task_id: {
               type: "string",
@@ -761,7 +761,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 "ID of the task containing the comment (required for creating replies)",
             },
           },
-          required: ["parent_comment_id", "content", "user_id", "task_id"],
+          required: ["parent_comment_id", "content", "task_id"],
         },
       },
       {
@@ -776,10 +776,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user requesting the thread",
+              description: "ID of the user requesting the thread (optional, will use default project user if not provided)",
             },
           },
-          required: ["comment_id", "user_id"],
+          required: ["comment_id"],
         },
       },
       {
@@ -794,7 +794,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user requesting comments",
+              description: "ID of the user requesting comments (optional, will use default project user if not provided)",
             },
             include_deleted: {
               type: "boolean",
@@ -829,7 +829,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               default: 0,
             },
           },
-          required: ["project_id", "user_id"],
+          required: ["project_id"],
         },
       },
     ],
