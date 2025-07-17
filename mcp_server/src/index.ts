@@ -121,9 +121,50 @@ async function resolveProjectContext(explicitProjectName?: string): Promise<stri
     return detected;
   }
   
-  // 4. Fall back to default project
-  const defaultProject = simpleTaskService.getAllProjects()[0];
-  return defaultProject?.projectName || null;
+  // 4. Check if we have multiple projects and no clear choice
+  const projects = simpleTaskService.getAllProjects();
+  if (projects.length > 1) {
+    // Multiple projects but no clear choice - return null to trigger project selection prompt
+    return null;
+  }
+  
+  // 5. Fall back to default project (single project case)
+  const defaultProject = projects[0];
+  if (defaultProject) {
+    console.log(`📌 Using default project: ${defaultProject.name} (${defaultProject.projectName})`);
+    return defaultProject.projectName;
+  }
+  
+  return null;
+}
+
+// Helper function to generate project resolution error response
+function generateProjectResolutionError() {
+  const projects = simpleTaskService.getAllProjects();
+  if (projects.length > 1) {
+    const projectList = projects.map((p, idx) => 
+      `${idx + 1}. ${p.name} (${p.projectName})`
+    ).join('\n');
+    return {
+      content: [
+        {
+          type: "text",
+          text: `❌ Multiple projects available but no project selected. Please use 'simpletask_switch_project' to select one:\n\n${projectList}\n\nOr specify the 'project_name' parameter directly.`,
+        },
+      ],
+      isError: true,
+    };
+  } else {
+    return {
+      content: [
+        {
+          type: "text",
+          text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
+        },
+      ],
+      isError: true,
+    };
+  }
 }
 
 // Helper function to handle project switching
@@ -176,6 +217,7 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
+      elicitation: {},
     },
   },
 );
@@ -1058,15 +1100,7 @@ async function handleSimpleTaskCreateTask(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.createTask(
@@ -1106,15 +1140,7 @@ async function handleSimpleTaskGetTasks(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.getTasks(resolvedProject);
@@ -1151,15 +1177,7 @@ async function handleSimpleTaskGetTask(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.getTask(task_id, resolvedProject);
@@ -1196,15 +1214,7 @@ async function handleSimpleTaskUpdateTask(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.updateTask(
@@ -1245,15 +1255,7 @@ async function handleSimpleTaskUpdateTaskStatus(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.updateTaskStatus(
@@ -1294,15 +1296,7 @@ async function handleSimpleTaskDeleteTask(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.deleteTask(task_id, resolvedProject);
@@ -1339,15 +1333,7 @@ async function handleSimpleTaskSearchTasks(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.searchTasks(query, resolvedProject);
@@ -1384,15 +1370,7 @@ async function handleSimpleTaskGetTasksByStatus(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.getTasksByStatus(
@@ -1434,15 +1412,7 @@ async function handleSimpleTaskGetTasksByPriority(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.getTasksByPriority(
@@ -1484,15 +1454,7 @@ async function handleSimpleTaskGetTasksByOrderKey(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.getTasksByOrderKey(
@@ -1534,15 +1496,7 @@ async function handleSimpleTaskGetTaskDependencies(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.getTaskDependencies(
@@ -1584,15 +1538,7 @@ async function handleSimpleTaskGetTaskDependents(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.getTaskDependents(
@@ -1634,15 +1580,7 @@ async function handleSimpleTaskGenerateTasks(args: any) {
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: "❌ No project specified and unable to determine current project. Use `simpletask_switch_project` to select a project or specify `project_name` parameter.",
-          },
-        ],
-        isError: true,
-      };
+      return generateProjectResolutionError();
     }
 
     const result = await simpleTaskService.generateTasks(
