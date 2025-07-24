@@ -22,6 +22,13 @@ export interface ProjectDefinition {
   description?: string;
 }
 
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  order: number;
+  completed: boolean;
+}
+
 export interface Task {
   id?: string;
   title: string;
@@ -34,6 +41,7 @@ export interface Task {
   assigned_to?: string | null;
   created_at?: string;
   updated_at?: string;
+  checklist?: ChecklistItem[];
 }
 
 export interface TaskSearchResult {
@@ -49,6 +57,7 @@ export interface TaskSearchResult {
   created_by: string;
   created_at: string;
   updated_at: string;
+  checklist?: ChecklistItem[];
 }
 
 export class SimpleTaskService {
@@ -684,5 +693,142 @@ export class SimpleTaskService {
       undefined,
       projectName,
     );
+  }
+
+  // Process the checklist for a task
+  async processChecklist(
+    taskId: string,
+    projectName?: string
+  ): Promise<void> {
+    const task = await this.getTask(taskId, projectName);
+
+    if (!task.checklist || !Array.isArray(task.checklist)) {
+      throw new Error("Checklist is missing or invalid.");
+    }
+
+    // Sort checklist items by order
+    const sortedChecklist = task.checklist.sort((a, b) => a.order - b.order);
+
+    for (const item of sortedChecklist) {
+      if (item.completed) {
+        continue; // Skip completed items
+      }
+
+      // Suggest how to complete the item or ask for clarification
+      console.log(`Processing checklist item: ${item.text}`);
+      // TODO: Add AI logic to suggest or ask for clarification
+
+      // Mark the item as completed
+      item.completed = true;
+
+      // Update the task with the modified checklist
+      await this.updateTask(taskId, { checklist: task.checklist }, projectName);
+
+      // Break after processing one item to ensure order is respected
+      break;
+    }
+  }
+
+  // Add a new item to a task's checklist
+  async addChecklistItem(
+    taskId: string,
+    text: string,
+    order?: number,
+    completed: boolean = false,
+    projectName?: string
+  ): Promise<TaskSearchResult> {
+    const task = await this.getTask(taskId, projectName);
+    
+    // Initialize checklist if it doesn't exist
+    if (!task.checklist) {
+      task.checklist = [];
+    }
+
+    // Auto-assign order if not provided
+    if (order === undefined) {
+      order = task.checklist.length > 0 ? Math.max(...task.checklist.map(item => item.order)) + 1 : 0;
+    }
+
+    // Generate a new ID for the checklist item
+    const newItem = {
+      id: crypto.randomUUID(),
+      text,
+      order,
+      completed
+    };
+
+    task.checklist.push(newItem);
+    
+    return await this.updateTask(taskId, { checklist: task.checklist }, projectName);
+  }
+
+  // Update an existing checklist item
+  async updateChecklistItem(
+    taskId: string,
+    itemId: string,
+    updates: { text?: string; order?: number; completed?: boolean },
+    projectName?: string
+  ): Promise<TaskSearchResult> {
+    const task = await this.getTask(taskId, projectName);
+    
+    if (!task.checklist || !Array.isArray(task.checklist)) {
+      throw new Error("Task has no checklist.");
+    }
+
+    const itemIndex = task.checklist.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) {
+      throw new Error(`Checklist item with ID ${itemId} not found.`);
+    }
+
+    // Update the item with provided values
+    if (updates.text !== undefined) {
+      task.checklist[itemIndex].text = updates.text;
+    }
+    if (updates.order !== undefined) {
+      task.checklist[itemIndex].order = updates.order;
+    }
+    if (updates.completed !== undefined) {
+      task.checklist[itemIndex].completed = updates.completed;
+    }
+
+    return await this.updateTask(taskId, { checklist: task.checklist }, projectName);
+  }
+
+  // Remove an item from a task's checklist
+  async removeChecklistItem(
+    taskId: string,
+    itemId: string,
+    projectName?: string
+  ): Promise<TaskSearchResult> {
+    const task = await this.getTask(taskId, projectName);
+    
+    if (!task.checklist || !Array.isArray(task.checklist)) {
+      throw new Error("Task has no checklist.");
+    }
+
+    const itemIndex = task.checklist.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) {
+      throw new Error(`Checklist item with ID ${itemId} not found.`);
+    }
+
+    // Remove the item
+    task.checklist.splice(itemIndex, 1);
+
+    return await this.updateTask(taskId, { checklist: task.checklist }, projectName);
+  }
+
+  // Get the checklist for a specific task
+  async getChecklist(
+    taskId: string,
+    projectName?: string
+  ): Promise<ChecklistItem[]> {
+    const task = await this.getTask(taskId, projectName);
+    
+    if (!task.checklist) {
+      return [];
+    }
+
+    // Return checklist sorted by order
+    return task.checklist.sort((a, b) => a.order - b.order);
   }
 }

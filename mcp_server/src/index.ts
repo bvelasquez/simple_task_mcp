@@ -874,6 +874,135 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["project_id"],
         },
       },
+      {
+        name: "simpletask_process_checklist",
+        description: "Process the checklist for a task using AI to suggest actions or ask clarifying questions.",
+        ai_instructions: [
+          "Use AI to analyze checklist items and suggest actions or ask clarifying questions.",
+          "Process checklist items in the order specified by their 'order' property.",
+          "Skip items that are already marked as completed.",
+          "Mark items as completed after processing them."
+        ],
+        inputSchema: {
+          type: "object",
+          properties: {
+            task_id: {
+              type: "string",
+              description: "ID of the task whose checklist needs to be processed."
+            },
+            project_name: {
+              type: "string",
+              description: "Project name (optional, uses default if not specified)."
+            }
+          },
+          required: ["task_id"]
+        }
+      },
+      {
+        name: "simpletask_add_checklist_item",
+        description: "Add a new item to a task's checklist",
+        inputSchema: {
+          type: "object",
+          properties: {
+            task_id: {
+              type: "string",
+              description: "ID of the task to add checklist item to"
+            },
+            text: {
+              type: "string",
+              description: "Text content of the checklist item"
+            },
+            order: {
+              type: "number",
+              description: "Order position for the item (optional, will auto-assign if not provided)"
+            },
+            completed: {
+              type: "boolean",
+              description: "Completion status of the item",
+              default: false
+            },
+            project_name: {
+              type: "string",
+              description: "Project name (optional, uses default if not specified)"
+            }
+          },
+          required: ["task_id", "text"]
+        }
+      },
+      {
+        name: "simpletask_update_checklist_item",
+        description: "Update an existing checklist item",
+        inputSchema: {
+          type: "object",
+          properties: {
+            task_id: {
+              type: "string",
+              description: "ID of the task containing the checklist item"
+            },
+            id: {
+              type: "string",
+              description: "ID of the checklist item to update"
+            },
+            text: {
+              type: "string",
+              description: "New text content for the checklist item"
+            },
+            order: {
+              type: "number",
+              description: "New order position for the item"
+            },
+            completed: {
+              type: "boolean",
+              description: "New completion status of the item"
+            },
+            project_name: {
+              type: "string",
+              description: "Project name (optional, uses default if not specified)"
+            }
+          },
+          required: ["task_id", "id"]
+        }
+      },
+      {
+        name: "simpletask_remove_checklist_item",
+        description: "Remove an item from a task's checklist",
+        inputSchema: {
+          type: "object",
+          properties: {
+            task_id: {
+              type: "string",
+              description: "ID of the task to remove checklist item from"
+            },
+            id: {
+              type: "string",
+              description: "ID of the checklist item to remove"
+            },
+            project_name: {
+              type: "string",
+              description: "Project name (optional, uses default if not specified)"
+            }
+          },
+          required: ["task_id", "id"]
+        }
+      },
+      {
+        name: "simpletask_get_checklist",
+        description: "Get the checklist for a specific task",
+        inputSchema: {
+          type: "object",
+          properties: {
+            task_id: {
+              type: "string",
+              description: "ID of the task to get checklist for"
+            },
+            project_name: {
+              type: "string",
+              description: "Project name (optional, uses default if not specified)"
+            }
+          },
+          required: ["task_id"]
+        }
+      }
     ],
   };
 });
@@ -951,6 +1080,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleSimpleTaskGetCommentThread(args);
       case "simpletask_get_project_comments":
         return await handleSimpleTaskGetProjectComments(args);
+      case "simpletask_process_checklist":
+        return await handleSimpleTaskProcessChecklist(args);
+      case "simpletask_add_checklist_item":
+        return await handleSimpleTaskAddChecklistItem(args);
+      case "simpletask_update_checklist_item":
+        return await handleSimpleTaskUpdateChecklistItem(args);
+      case "simpletask_remove_checklist_item":
+        return await handleSimpleTaskRemoveChecklistItem(args);
+      case "simpletask_get_checklist":
+        return await handleSimpleTaskGetChecklist(args);
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -2002,6 +2141,167 @@ async function handleSimpleTaskGetCurrentProject() {
         },
       ],
       isError: true,
+    };
+  }
+}
+
+async function handleSimpleTaskProcessChecklist(args: any) {
+  const { task_id, project_name } = args;
+
+  try {
+    // Use the SimpleTaskService to process the checklist
+    await simpleTaskService.processChecklist(task_id, project_name);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ Successfully processed the checklist for task ID: ${task_id}`
+        }
+      ]
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      content: [
+        {
+          type: "text",
+          text: `❌ Failed to process the checklist: ${errorMessage}`
+        }
+      ],
+      isError: true
+    };
+  }
+}
+
+async function handleSimpleTaskAddChecklistItem(args: any) {
+  const { task_id, text, order, completed = false, project_name } = args;
+
+  try {
+    const result = await simpleTaskService.addChecklistItem(
+      task_id,
+      text,
+      order,
+      completed,
+      project_name
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ Successfully added checklist item to task ${task_id}\n\n${JSON.stringify(result, null, 2)}`
+        }
+      ]
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      content: [
+        {
+          type: "text",
+          text: `❌ Failed to add checklist item: ${errorMessage}`
+        }
+      ],
+      isError: true
+    };
+  }
+}
+
+async function handleSimpleTaskUpdateChecklistItem(args: any) {
+  const { task_id, id, text, order, completed, project_name } = args;
+
+  try {
+    const updates: any = {};
+    if (text !== undefined) updates.text = text;
+    if (order !== undefined) updates.order = order;
+    if (completed !== undefined) updates.completed = completed;
+
+    const result = await simpleTaskService.updateChecklistItem(
+      task_id,
+      id,
+      updates,
+      project_name
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ Successfully updated checklist item ${id} in task ${task_id}\n\n${JSON.stringify(result, null, 2)}`
+        }
+      ]
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      content: [
+        {
+          type: "text",
+          text: `❌ Failed to update checklist item: ${errorMessage}`
+        }
+      ],
+      isError: true
+    };
+  }
+}
+
+async function handleSimpleTaskRemoveChecklistItem(args: any) {
+  const { task_id, id, project_name } = args;
+
+  try {
+    const result = await simpleTaskService.removeChecklistItem(
+      task_id,
+      id,
+      project_name
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `✅ Successfully removed checklist item ${id} from task ${task_id}\n\n${JSON.stringify(result, null, 2)}`
+        }
+      ]
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      content: [
+        {
+          type: "text",
+          text: `❌ Failed to remove checklist item: ${errorMessage}`
+        }
+      ],
+      isError: true
+    };
+  }
+}
+
+async function handleSimpleTaskGetChecklist(args: any) {
+  const { task_id, project_name } = args;
+
+  try {
+    const checklist = await simpleTaskService.getChecklist(task_id, project_name);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `📋 Checklist for task ${task_id}:\n\n${JSON.stringify(checklist, null, 2)}`
+        }
+      ]
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      content: [
+        {
+          type: "text",
+          text: `❌ Failed to get checklist: ${errorMessage}`
+        }
+      ],
+      isError: true
     };
   }
 }
