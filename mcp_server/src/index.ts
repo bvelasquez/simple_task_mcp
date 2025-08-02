@@ -35,25 +35,27 @@ async function detectProjectFromWorkspace(): Promise<string | null> {
   try {
     // Cache workspace detection for 5 minutes
     const now = Date.now();
-    if (sessionContext.lastWorkspaceDetection && 
-        (now - sessionContext.lastWorkspaceDetection) < 5 * 60 * 1000 &&
-        sessionContext.currentProject) {
+    if (
+      sessionContext.lastWorkspaceDetection &&
+      now - sessionContext.lastWorkspaceDetection < 5 * 60 * 1000 &&
+      sessionContext.currentProject
+    ) {
       return sessionContext.currentProject;
     }
 
     // Try to find project.json in common locations
-    const fs = await import('fs');
+    const fs = await import("fs");
     const possiblePaths = [
-      './project.json',
-      '../project.json',
-      '../../project.json',
-      process.cwd() + '/project.json'
+      "./project.json",
+      "../project.json",
+      "../../project.json",
+      process.cwd() + "/project.json",
     ];
 
     for (const projectPath of possiblePaths) {
       try {
         if (fs.existsSync(projectPath)) {
-          const projectData = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+          const projectData = JSON.parse(fs.readFileSync(projectPath, "utf8"));
           if (projectData.name) {
             // Try to match the project name to available Simple Task projects
             const matchedProject = findProjectByName(projectData.name);
@@ -61,7 +63,9 @@ async function detectProjectFromWorkspace(): Promise<string | null> {
               sessionContext.currentProject = matchedProject.projectName;
               sessionContext.detectedFromWorkspace = true;
               sessionContext.lastWorkspaceDetection = now;
-              console.log(`🔍 Auto-detected project: ${matchedProject.name} (${matchedProject.projectName})`);
+              console.log(
+                `🔍 Auto-detected project: ${matchedProject.name} (${matchedProject.projectName})`,
+              );
               return matchedProject.projectName;
             }
           }
@@ -73,7 +77,7 @@ async function detectProjectFromWorkspace(): Promise<string | null> {
   } catch (error) {
     // Ignore workspace detection errors
   }
-  
+
   return null;
 }
 
@@ -81,60 +85,68 @@ async function detectProjectFromWorkspace(): Promise<string | null> {
 function findProjectByName(name: string): any | null {
   const projects = simpleTaskService.getAllProjects();
   const lowerName = name.toLowerCase();
-  
+
   // Exact match first
   for (const project of projects) {
-    if (project.name.toLowerCase() === lowerName || 
-        project.projectName.toLowerCase() === lowerName) {
+    if (
+      project.name.toLowerCase() === lowerName ||
+      project.projectName.toLowerCase() === lowerName
+    ) {
       return project;
     }
   }
-  
+
   // Partial match
   for (const project of projects) {
-    if (project.name.toLowerCase().includes(lowerName) || 
-        project.projectName.toLowerCase().includes(lowerName) ||
-        lowerName.includes(project.name.toLowerCase()) ||
-        lowerName.includes(project.projectName.toLowerCase())) {
+    if (
+      project.name.toLowerCase().includes(lowerName) ||
+      project.projectName.toLowerCase().includes(lowerName) ||
+      lowerName.includes(project.name.toLowerCase()) ||
+      lowerName.includes(project.projectName.toLowerCase())
+    ) {
       return project;
     }
   }
-  
+
   return null;
 }
 
 // Helper function to resolve project for operations
-async function resolveProjectContext(explicitProjectName?: string): Promise<string | null> {
+async function resolveProjectContext(
+  explicitProjectName?: string,
+): Promise<string | null> {
   // 1. Use explicit project name if provided
   if (explicitProjectName) {
     return explicitProjectName;
   }
-  
+
   // 2. Use session context if available
   if (sessionContext.currentProject) {
     return sessionContext.currentProject;
   }
-  
+
   // 3. Try to auto-detect from workspace
   const detected = await detectProjectFromWorkspace();
   if (detected) {
     return detected;
   }
-  
+
   // 4. Check if we have multiple projects and no clear choice
   const projects = simpleTaskService.getAllProjects();
   if (projects.length > 1) {
     // Multiple projects but no clear choice - return null to trigger project selection prompt
     return null;
   }
-  
+
   // 5. Fall back to default project (single project case)
   const defaultProject = projects[0];
   if (defaultProject) {
-    console.log(`📌 Using default project: ${defaultProject.name} (${defaultProject.projectName})`);
+    console.log(
+      `📌 Using default project: ${defaultProject.name} (${defaultProject.projectName})`,
+    );
     return defaultProject.projectName;
   }
-  
+
   return null;
 }
 
@@ -142,9 +154,9 @@ async function resolveProjectContext(explicitProjectName?: string): Promise<stri
 function generateProjectResolutionError() {
   const projects = simpleTaskService.getAllProjects();
   if (projects.length > 1) {
-    const projectList = projects.map((p, idx) => 
-      `${idx + 1}. ${p.name} (${p.projectName})`
-    ).join('\n');
+    const projectList = projects
+      .map((p, idx) => `${idx + 1}. ${p.name} (${p.projectName})`)
+      .join("\n");
     return {
       content: [
         {
@@ -168,21 +180,30 @@ function generateProjectResolutionError() {
 }
 
 // Helper function to handle project switching
-function switchToProject(projectIdentifier: string): { success: boolean; message: string; project?: any } {
+function switchToProject(projectIdentifier: string): {
+  success: boolean;
+  message: string;
+  project?: any;
+} {
   const project = findProjectByName(projectIdentifier);
   if (project) {
     sessionContext.currentProject = project.projectName;
     sessionContext.detectedFromWorkspace = false;
-    console.log(`🔄 Switched to project: ${project.name} (${project.projectName})`);
+    console.log(
+      `🔄 Switched to project: ${project.name} (${project.projectName})`,
+    );
     return {
       success: true,
       message: `Switched to project: ${project.name} (${project.projectName})`,
-      project: project
+      project: project,
     };
   } else {
     return {
       success: false,
-      message: `Project '${projectIdentifier}' not found. Available projects: ${simpleTaskService.getAllProjects().map(p => p.name).join(', ')}`
+      message: `Project '${projectIdentifier}' not found. Available projects: ${simpleTaskService
+        .getAllProjects()
+        .map((p) => p.name)
+        .join(", ")}`,
     };
   }
 }
@@ -201,11 +222,11 @@ allProjects.forEach((project, index) => {
 console.log("");
 
 // Initialize workspace detection
-detectProjectFromWorkspace().then(detected => {
+detectProjectFromWorkspace().then((detected) => {
   if (detected) {
     console.log(`🎯 Using auto-detected project: ${detected}`);
   } else {
-    console.log(`📌 Using default project: ${allProjects[0]?.name || 'none'}`);
+    console.log(`📌 Using default project: ${allProjects[0]?.name || "none"}`);
   }
 });
 
@@ -362,7 +383,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "simpletask_get_tasks",
-        description: "Get all tasks from the Simple Task project",
+        description:
+          "Get tasks from the Simple Task project with pagination and summary support",
         inputSchema: {
           type: "object",
           properties: {
@@ -370,6 +392,57 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description:
                 "Project name (optional, uses default if not specified)",
+            },
+            limit: {
+              type: "number",
+              description:
+                "Maximum number of tasks to return (default: 25, max: 100)",
+              minimum: 1,
+              maximum: 100,
+              default: 25,
+            },
+            offset: {
+              type: "number",
+              description:
+                "Number of tasks to skip for pagination (default: 0)",
+              minimum: 0,
+              default: 0,
+            },
+            include_full_data: {
+              type: "boolean",
+              description:
+                "Return full task data (true) or summary data (false). Summary includes: id, title, status, priority, created_at, assigned_to (default: false)",
+              default: false,
+            },
+          },
+        },
+      },
+      {
+        name: "simpletask_get_tasks_summary",
+        description:
+          "Get a lightweight summary of tasks to reduce token usage. Returns only essential fields: id, title, status, priority, created_at, assigned_to",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_name: {
+              type: "string",
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
+            limit: {
+              type: "number",
+              description:
+                "Maximum number of tasks to return (default: 25, max: 100)",
+              minimum: 1,
+              maximum: 100,
+              default: 25,
+            },
+            offset: {
+              type: "number",
+              description:
+                "Number of tasks to skip for pagination (default: 0)",
+              minimum: 0,
+              default: 0,
             },
           },
         },
@@ -478,7 +551,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "simpletask_search_tasks",
-        description: "Search tasks by title or description",
+        description:
+          "Search tasks by title or description with pagination and summary support",
         inputSchema: {
           type: "object",
           properties: {
@@ -492,13 +566,35 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 "Project name (optional, uses default if not specified)",
             },
+            limit: {
+              type: "number",
+              description:
+                "Maximum number of tasks to return (default: 25, max: 100)",
+              minimum: 1,
+              maximum: 100,
+              default: 25,
+            },
+            offset: {
+              type: "number",
+              description:
+                "Number of tasks to skip for pagination (default: 0)",
+              minimum: 0,
+              default: 0,
+            },
+            include_full_data: {
+              type: "boolean",
+              description:
+                "Return full task data (true) or summary data (false). Summary includes: id, title, status, priority, created_at, assigned_to (default: false)",
+              default: false,
+            },
           },
           required: ["query"],
         },
       },
       {
         name: "simpletask_get_tasks_by_status",
-        description: "Get tasks filtered by status",
+        description:
+          "Get tasks filtered by status with pagination and summary support",
         inputSchema: {
           type: "object",
           properties: {
@@ -512,13 +608,35 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 "Project name (optional, uses default if not specified)",
             },
+            limit: {
+              type: "number",
+              description:
+                "Maximum number of tasks to return (default: 25, max: 100)",
+              minimum: 1,
+              maximum: 100,
+              default: 25,
+            },
+            offset: {
+              type: "number",
+              description:
+                "Number of tasks to skip for pagination (default: 0)",
+              minimum: 0,
+              default: 0,
+            },
+            include_full_data: {
+              type: "boolean",
+              description:
+                "Return full task data (true) or summary data (false). Summary includes: id, title, status, priority, created_at, assigned_to (default: false)",
+              default: false,
+            },
           },
           required: ["status"],
         },
       },
       {
         name: "simpletask_get_tasks_by_priority",
-        description: "Get tasks filtered by priority",
+        description:
+          "Get tasks filtered by priority with pagination and summary support",
         inputSchema: {
           type: "object",
           properties: {
@@ -532,13 +650,35 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description:
                 "Project name (optional, uses default if not specified)",
             },
+            limit: {
+              type: "number",
+              description:
+                "Maximum number of tasks to return (default: 25, max: 100)",
+              minimum: 1,
+              maximum: 100,
+              default: 25,
+            },
+            offset: {
+              type: "number",
+              description:
+                "Number of tasks to skip for pagination (default: 0)",
+              minimum: 0,
+              default: 0,
+            },
+            include_full_data: {
+              type: "boolean",
+              description:
+                "Return full task data (true) or summary data (false). Summary includes: id, title, status, priority, created_at, assigned_to (default: false)",
+              default: false,
+            },
           },
           required: ["priority"],
         },
       },
       {
         name: "simpletask_get_tasks_by_order_key",
-        description: "Get tasks filtered by order key (e.g., 'h', 'za', 'zb')",
+        description:
+          "Get tasks filtered by order key (e.g., 'h', 'za', 'zb') with pagination and summary support",
         inputSchema: {
           type: "object",
           properties: {
@@ -550,6 +690,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description:
                 "Project name (optional, uses default if not specified)",
+            },
+            limit: {
+              type: "number",
+              description:
+                "Maximum number of tasks to return (default: 25, max: 100)",
+              minimum: 1,
+              maximum: 100,
+              default: 25,
+            },
+            offset: {
+              type: "number",
+              description:
+                "Number of tasks to skip for pagination (default: 0)",
+              minimum: 0,
+              default: 0,
+            },
+            include_full_data: {
+              type: "boolean",
+              description:
+                "Return full task data (true) or summary data (false). Summary includes: id, title, status, priority, created_at, assigned_to (default: false)",
+              default: false,
             },
           },
           required: ["order_key"],
@@ -654,7 +815,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user creating the comment (optional, will use task creator if not provided)",
+              description:
+                "ID of the user creating the comment (optional, will use task creator if not provided)",
             },
           },
           required: ["task_id", "content"],
@@ -672,7 +834,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user requesting comments (optional, will use task creator if not provided)",
+              description:
+                "ID of the user requesting comments (optional, will use task creator if not provided)",
             },
             include_deleted: {
               type: "boolean",
@@ -726,7 +889,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user updating the comment (optional, will use task creator if task_id provided)",
+              description:
+                "ID of the user updating the comment (optional, will use task creator if task_id provided)",
             },
             task_id: {
               type: "string",
@@ -749,7 +913,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user deleting the comment (optional, will use task creator if task_id provided)",
+              description:
+                "ID of the user deleting the comment (optional, will use task creator if task_id provided)",
             },
             task_id: {
               type: "string",
@@ -795,7 +960,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user creating the reply (optional, will use task creator if not provided)",
+              description:
+                "ID of the user creating the reply (optional, will use task creator if not provided)",
             },
             task_id: {
               type: "string",
@@ -818,7 +984,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user requesting the thread (optional, will use default project user if not provided)",
+              description:
+                "ID of the user requesting the thread (optional, will use default project user if not provided)",
             },
           },
           required: ["comment_id"],
@@ -836,7 +1003,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             user_id: {
               type: "string",
-              description: "ID of the user requesting comments (optional, will use default project user if not provided)",
+              description:
+                "ID of the user requesting comments (optional, will use default project user if not provided)",
             },
             include_deleted: {
               type: "boolean",
@@ -876,27 +1044,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "simpletask_process_checklist",
-        description: "Process the checklist for a task using AI to suggest actions or ask clarifying questions.",
+        description:
+          "Process the checklist for a task using AI to suggest actions or ask clarifying questions.",
         ai_instructions: [
           "Use AI to analyze checklist items and suggest actions or ask clarifying questions.",
           "Process checklist items in the order specified by their 'order' property.",
           "Skip items that are already marked as completed.",
-          "Mark items as completed after processing them."
+          "Mark items as completed after processing them.",
         ],
         inputSchema: {
           type: "object",
           properties: {
             task_id: {
               type: "string",
-              description: "ID of the task whose checklist needs to be processed."
+              description:
+                "ID of the task whose checklist needs to be processed.",
             },
             project_name: {
               type: "string",
-              description: "Project name (optional, uses default if not specified)."
-            }
+              description:
+                "Project name (optional, uses default if not specified).",
+            },
           },
-          required: ["task_id"]
-        }
+          required: ["task_id"],
+        },
       },
       {
         name: "simpletask_add_checklist_item",
@@ -906,28 +1077,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             task_id: {
               type: "string",
-              description: "ID of the task to add checklist item to"
+              description: "ID of the task to add checklist item to",
             },
             text: {
               type: "string",
-              description: "Text content of the checklist item"
+              description: "Text content of the checklist item",
             },
             order: {
               type: "number",
-              description: "Order position for the item (optional, will auto-assign if not provided)"
+              description:
+                "Order position for the item (optional, will auto-assign if not provided)",
             },
             completed: {
               type: "boolean",
               description: "Completion status of the item",
-              default: false
+              default: false,
             },
             project_name: {
               type: "string",
-              description: "Project name (optional, uses default if not specified)"
-            }
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
           },
-          required: ["task_id", "text"]
-        }
+          required: ["task_id", "text"],
+        },
       },
       {
         name: "simpletask_update_checklist_item",
@@ -937,31 +1110,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             task_id: {
               type: "string",
-              description: "ID of the task containing the checklist item"
+              description: "ID of the task containing the checklist item",
             },
             id: {
               type: "string",
-              description: "ID of the checklist item to update"
+              description: "ID of the checklist item to update",
             },
             text: {
               type: "string",
-              description: "New text content for the checklist item"
+              description: "New text content for the checklist item",
             },
             order: {
               type: "number",
-              description: "New order position for the item"
+              description: "New order position for the item",
             },
             completed: {
               type: "boolean",
-              description: "New completion status of the item"
+              description: "New completion status of the item",
             },
             project_name: {
               type: "string",
-              description: "Project name (optional, uses default if not specified)"
-            }
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
           },
-          required: ["task_id", "id"]
-        }
+          required: ["task_id", "id"],
+        },
       },
       {
         name: "simpletask_remove_checklist_item",
@@ -971,19 +1145,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             task_id: {
               type: "string",
-              description: "ID of the task to remove checklist item from"
+              description: "ID of the task to remove checklist item from",
             },
             id: {
               type: "string",
-              description: "ID of the checklist item to remove"
+              description: "ID of the checklist item to remove",
             },
             project_name: {
               type: "string",
-              description: "Project name (optional, uses default if not specified)"
-            }
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
           },
-          required: ["task_id", "id"]
-        }
+          required: ["task_id", "id"],
+        },
       },
       {
         name: "simpletask_get_checklist",
@@ -993,16 +1168,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             task_id: {
               type: "string",
-              description: "ID of the task to get checklist for"
+              description: "ID of the task to get checklist for",
             },
             project_name: {
               type: "string",
-              description: "Project name (optional, uses default if not specified)"
-            }
+              description:
+                "Project name (optional, uses default if not specified)",
+            },
           },
-          required: ["task_id"]
-        }
-      }
+          required: ["task_id"],
+        },
+      },
     ],
   };
 });
@@ -1039,6 +1215,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleSimpleTaskCreateTask(args);
       case "simpletask_get_tasks":
         return await handleSimpleTaskGetTasks(args);
+      case "simpletask_get_tasks_summary":
+        return await handleSimpleTaskGetTasksSummary(args);
       case "simpletask_get_task":
         return await handleSimpleTaskGetTask(args);
       case "simpletask_update_task":
@@ -1275,17 +1453,22 @@ async function handleSimpleTaskCreateTask(args: any) {
 
 async function handleSimpleTaskGetTasks(args: any) {
   try {
-    const { project_name } = args || {};
+    const { project_name, limit, offset, include_full_data } = args || {};
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
       return generateProjectResolutionError();
     }
 
-    const result = await simpleTaskService.getTasks(resolvedProject);
+    const result = await simpleTaskService.getTasksPaginated(
+      { limit, offset, include_full_data },
+      resolvedProject,
+    );
 
     // Log the project used for context
-    console.log(`📋 Retrieved tasks from project: ${resolvedProject}`);
+    console.log(
+      `📋 Retrieved tasks from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
+    );
 
     return {
       content: [
@@ -1301,6 +1484,48 @@ async function handleSimpleTaskGetTasks(args: any) {
         {
           type: "text",
           text: `Failed to get tasks: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+async function handleSimpleTaskGetTasksSummary(args: any) {
+  try {
+    const { project_name, limit, offset } = args || {};
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return generateProjectResolutionError();
+    }
+
+    const result = await simpleTaskService.getTasksPaginated(
+      { limit, offset, include_full_data: false },
+      resolvedProject,
+    );
+
+    // Log the project used for context
+    console.log(
+      `📋 Retrieved task summaries from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Failed to get task summaries: ${
             error instanceof Error ? error.message : String(error)
           }`,
         },
@@ -1468,17 +1693,23 @@ async function handleSimpleTaskDeleteTask(args: any) {
 
 async function handleSimpleTaskSearchTasks(args: any) {
   try {
-    const { query, project_name } = args;
+    const { query, project_name, limit, offset, include_full_data } = args;
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
       return generateProjectResolutionError();
     }
 
-    const result = await simpleTaskService.searchTasks(query, resolvedProject);
+    const result = await simpleTaskService.searchTasksPaginated(
+      query,
+      { limit, offset, include_full_data },
+      resolvedProject,
+    );
 
     // Log the project used for context
-    console.log(`🔍 Searched tasks in project: ${resolvedProject}`);
+    console.log(
+      `🔍 Searched tasks in project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
+    );
 
     return {
       content: [
@@ -1505,21 +1736,22 @@ async function handleSimpleTaskSearchTasks(args: any) {
 
 async function handleSimpleTaskGetTasksByStatus(args: any) {
   try {
-    const { status, project_name } = args;
+    const { status, project_name, limit, offset, include_full_data } = args;
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
       return generateProjectResolutionError();
     }
 
-    const result = await simpleTaskService.getTasksByStatus(
+    const result = await simpleTaskService.getTasksByStatusPaginated(
       status,
+      { limit, offset, include_full_data },
       resolvedProject,
     );
 
     // Log the project used for context
     console.log(
-      `📊 Retrieved tasks by status from project: ${resolvedProject}`,
+      `📊 Retrieved tasks by status from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
     return {
@@ -1547,21 +1779,22 @@ async function handleSimpleTaskGetTasksByStatus(args: any) {
 
 async function handleSimpleTaskGetTasksByPriority(args: any) {
   try {
-    const { priority, project_name } = args;
+    const { priority, project_name, limit, offset, include_full_data } = args;
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
       return generateProjectResolutionError();
     }
 
-    const result = await simpleTaskService.getTasksByPriority(
+    const result = await simpleTaskService.getTasksByPriorityPaginated(
       priority,
+      { limit, offset, include_full_data },
       resolvedProject,
     );
 
     // Log the project used for context
     console.log(
-      `🔢 Retrieved tasks by priority from project: ${resolvedProject}`,
+      `🔢 Retrieved tasks by priority from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
     return {
@@ -1589,21 +1822,22 @@ async function handleSimpleTaskGetTasksByPriority(args: any) {
 
 async function handleSimpleTaskGetTasksByOrderKey(args: any) {
   try {
-    const { order_key, project_name } = args;
+    const { order_key, project_name, limit, offset, include_full_data } = args;
     const resolvedProject = await resolveProjectContext(project_name);
 
     if (!resolvedProject) {
       return generateProjectResolutionError();
     }
 
-    const result = await simpleTaskService.getTasksByOrderKey(
+    const result = await simpleTaskService.getTasksByOrderKeyPaginated(
       order_key,
+      { limit, offset, include_full_data },
       resolvedProject,
     );
 
     // Log the project used for context
     console.log(
-      `📝 Retrieved tasks by order key from project: ${resolvedProject}`,
+      `📝 Retrieved tasks by order key from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
     return {
@@ -2149,61 +2383,83 @@ async function handleSimpleTaskProcessChecklist(args: any) {
   const { task_id, project_name } = args;
 
   try {
+    const resolvedProjectName = await resolveProjectContext(project_name);
+
+    if (!resolvedProjectName) {
+      return generateProjectResolutionError();
+    }
+
     // Use the SimpleTaskService to process the checklist
-    await simpleTaskService.processChecklist(task_id, project_name);
+    await simpleTaskService.processChecklist(task_id, resolvedProjectName);
 
     return {
       content: [
         {
           type: "text",
-          text: `✅ Successfully processed the checklist for task ID: ${task_id}`
-        }
-      ]
+          text: `✅ Successfully processed the checklist for task ID: ${task_id}`,
+        },
+      ],
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return {
       content: [
         {
           type: "text",
-          text: `❌ Failed to process the checklist: ${errorMessage}`
-        }
+          text: `❌ Failed to process the checklist: ${errorMessage}`,
+        },
       ],
-      isError: true
+      isError: true,
     };
   }
 }
 
 async function handleSimpleTaskAddChecklistItem(args: any) {
-  const { task_id, text, order, completed = false, project_name } = args;
-
   try {
+    const { task_id, text, order, completed = false, project_name } = args;
+    const resolvedProject = await resolveProjectContext(project_name);
+
+    if (!resolvedProject) {
+      return generateProjectResolutionError();
+    }
+
     const result = await simpleTaskService.addChecklistItem(
       task_id,
       text,
       order,
       completed,
-      project_name
+      resolvedProject,
+    );
+
+    // Log the project used for context
+    console.log(
+      `✅ Added checklist item to task in project: ${resolvedProject}`,
     );
 
     return {
       content: [
         {
           type: "text",
-          text: `✅ Successfully added checklist item to task ${task_id}\n\n${JSON.stringify(result, null, 2)}`
-        }
-      ]
+          text: `✅ Successfully added checklist item to task ${task_id}\n\n${JSON.stringify(
+            result,
+            null,
+            2,
+          )}`,
+        },
+      ],
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return {
       content: [
         {
           type: "text",
-          text: `❌ Failed to add checklist item: ${errorMessage}`
-        }
+          text: `❌ Failed to add checklist item: ${errorMessage}`,
+        },
       ],
-      isError: true
+      isError: true,
     };
   }
 }
@@ -2212,6 +2468,12 @@ async function handleSimpleTaskUpdateChecklistItem(args: any) {
   const { task_id, id, text, order, completed, project_name } = args;
 
   try {
+    const resolvedProjectName = await resolveProjectContext(project_name);
+
+    if (!resolvedProjectName) {
+      return generateProjectResolutionError();
+    }
+
     const updates: any = {};
     if (text !== undefined) updates.text = text;
     if (order !== undefined) updates.order = order;
@@ -2221,27 +2483,32 @@ async function handleSimpleTaskUpdateChecklistItem(args: any) {
       task_id,
       id,
       updates,
-      project_name
+      resolvedProjectName,
     );
 
     return {
       content: [
         {
           type: "text",
-          text: `✅ Successfully updated checklist item ${id} in task ${task_id}\n\n${JSON.stringify(result, null, 2)}`
-        }
-      ]
+          text: `✅ Successfully updated checklist item ${id} in task ${task_id}\n\n${JSON.stringify(
+            result,
+            null,
+            2,
+          )}`,
+        },
+      ],
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return {
       content: [
         {
           type: "text",
-          text: `❌ Failed to update checklist item: ${errorMessage}`
-        }
+          text: `❌ Failed to update checklist item: ${errorMessage}`,
+        },
       ],
-      isError: true
+      isError: true,
     };
   }
 }
@@ -2250,30 +2517,41 @@ async function handleSimpleTaskRemoveChecklistItem(args: any) {
   const { task_id, id, project_name } = args;
 
   try {
+    const resolvedProjectName = await resolveProjectContext(project_name);
+
+    if (!resolvedProjectName) {
+      return generateProjectResolutionError();
+    }
+
     const result = await simpleTaskService.removeChecklistItem(
       task_id,
       id,
-      project_name
+      resolvedProjectName,
     );
 
     return {
       content: [
         {
           type: "text",
-          text: `✅ Successfully removed checklist item ${id} from task ${task_id}\n\n${JSON.stringify(result, null, 2)}`
-        }
-      ]
+          text: `✅ Successfully removed checklist item ${id} from task ${task_id}\n\n${JSON.stringify(
+            result,
+            null,
+            2,
+          )}`,
+        },
+      ],
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return {
       content: [
         {
           type: "text",
-          text: `❌ Failed to remove checklist item: ${errorMessage}`
-        }
+          text: `❌ Failed to remove checklist item: ${errorMessage}`,
+        },
       ],
-      isError: true
+      isError: true,
     };
   }
 }
@@ -2282,26 +2560,40 @@ async function handleSimpleTaskGetChecklist(args: any) {
   const { task_id, project_name } = args;
 
   try {
-    const checklist = await simpleTaskService.getChecklist(task_id, project_name);
+    const resolvedProjectName = await resolveProjectContext(project_name);
+
+    if (!resolvedProjectName) {
+      return generateProjectResolutionError();
+    }
+
+    const checklist = await simpleTaskService.getChecklist(
+      task_id,
+      resolvedProjectName,
+    );
 
     return {
       content: [
         {
           type: "text",
-          text: `📋 Checklist for task ${task_id}:\n\n${JSON.stringify(checklist, null, 2)}`
-        }
-      ]
+          text: `📋 Checklist for task ${task_id}:\n\n${JSON.stringify(
+            checklist,
+            null,
+            2,
+          )}`,
+        },
+      ],
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return {
       content: [
         {
           type: "text",
-          text: `❌ Failed to get checklist: ${errorMessage}`
-        }
+          text: `❌ Failed to get checklist: ${errorMessage}`,
+        },
       ],
-      isError: true
+      isError: true,
     };
   }
 }

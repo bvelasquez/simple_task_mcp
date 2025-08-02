@@ -1,5 +1,6 @@
 import fetch from "node-fetch";
 import fs from "fs";
+import { randomUUID } from "crypto";
 
 export interface SimpleTaskConfig {
   apiKey: string;
@@ -42,6 +43,32 @@ export interface Task {
   created_at?: string;
   updated_at?: string;
   checklist?: ChecklistItem[];
+}
+
+// Pagination interfaces
+export interface PaginationOptions {
+  limit?: number;
+  offset?: number;
+  include_full_data?: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total_count: number;
+  has_more: boolean;
+  next_offset?: number;
+  limit: number;
+  offset: number;
+}
+
+// Task summary interface for lightweight responses
+export interface TaskSummary {
+  id: string;
+  title: string;
+  status: "todo" | "in_progress" | "review" | "completed" | "blocked";
+  priority: "low" | "medium" | "high";
+  created_at: string;
+  assigned_to: string | null;
 }
 
 export interface TaskSearchResult {
@@ -228,23 +255,62 @@ export class SimpleTaskService {
     return await response.json();
   }
 
+  // Utility method to transform full tasks to summaries
+  private transformToSummary(task: TaskSearchResult): TaskSummary {
+    return {
+      id: task.id,
+      title: task.title,
+      status: task.status as TaskSummary["status"],
+      priority: task.priority as TaskSummary["priority"],
+      created_at: task.created_at,
+      assigned_to: task.assigned_to,
+    };
+  }
+
+  // Utility method to apply pagination to any array
+  private applyPagination<T>(
+    items: T[],
+    options: PaginationOptions = {},
+  ): PaginatedResponse<T> {
+    const limit = Math.min(options.limit || 25, 100); // Default 25, max 100
+    const offset = options.offset || 0;
+
+    const total_count = items.length;
+    const paginatedItems = items.slice(offset, offset + limit);
+    const has_more = offset + limit < total_count;
+    const next_offset = has_more ? offset + limit : undefined;
+
+    return {
+      items: paginatedItems,
+      total_count,
+      has_more,
+      next_offset,
+      limit,
+      offset,
+    };
+  }
+
   // Create a new task
   async createTask(
     task: Task & { created_by?: string }, // Allow created_by to be provided
     projectName?: string,
   ): Promise<TaskSearchResult> {
     const projectConfig = this.getProjectConfig(projectName);
-    
+
     // If created_by not provided, try to get a default user_id from existing tasks
     if (!task.created_by) {
       try {
         task.created_by = await this.getDefaultUserId(projectName);
       } catch (error) {
         // If we can't get a default user_id, let the API handle it
-        console.warn(`Could not resolve default user_id for task creation: ${error instanceof Error ? error.message : String(error)}`);
+        console.warn(
+          `Could not resolve default user_id for task creation: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }
-    
+
     const result = await this.makeRequest(
       `/projects/${projectConfig.projectId}/tasks`,
       "POST",
@@ -254,8 +320,17 @@ export class SimpleTaskService {
     return result.task;
   }
 
-  // Get all tasks for the project
+  // Get all tasks for the project (original method - deprecated, use getTasksPaginated)
   async getTasks(projectName?: string): Promise<TaskSearchResult[]> {
+    const result = await this.getTasksPaginated({}, projectName);
+    return result.items as TaskSearchResult[];
+  }
+
+  // Enhanced method to get tasks with pagination and summary support
+  async getTasksPaginated(
+    options: PaginationOptions = {},
+    projectName?: string,
+  ): Promise<PaginatedResponse<TaskSummary | TaskSearchResult>> {
     const projectConfig = this.getProjectConfig(projectName);
     const result = await this.makeRequest(
       `/projects/${projectConfig.projectId}/tasks`,
@@ -263,7 +338,20 @@ export class SimpleTaskService {
       undefined,
       projectName,
     );
-    return result.tasks || [];
+
+    const allTasks: TaskSearchResult[] = result.tasks || [];
+
+    // Transform to summaries if not requesting full data
+    if (options.include_full_data) {
+      return this.applyPagination(allTasks, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    } else {
+      const summaries = allTasks.map((task) => this.transformToSummary(task));
+      return this.applyPagination(summaries, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    }
   }
 
   // Get a specific task by ID
@@ -312,46 +400,175 @@ export class SimpleTaskService {
     return result;
   }
 
-  // Search tasks by title or description
+  // Search tasks by title or description (original method - deprecated, use searchTasksPaginated)
   async searchTasks(
     query: string,
     projectName?: string,
   ): Promise<TaskSearchResult[]> {
-    const tasks = await this.getTasks(projectName);
+    const result = await this.searchTasksPaginated(query, {}, projectName);
+    return result.items as TaskSearchResult[];
+  }
+
+  // Enhanced method to search tasks with pagination and summary support
+  async searchTasksPaginated(
+    query: string,
+    options: PaginationOptions = {},
+    projectName?: string,
+  ): Promise<PaginatedResponse<TaskSummary | TaskSearchResult>> {
+    const tasksResult = await this.getTasksPaginated(
+      { include_full_data: true },
+      projectName,
+    );
+    const allTasks = tasksResult.items as TaskSearchResult[];
     const searchTerm = query.toLowerCase();
 
-    return tasks.filter(
+    const filteredTasks = allTasks.filter(
       (task) =>
         task.title.toLowerCase().includes(searchTerm) ||
         task.description.toLowerCase().includes(searchTerm),
     );
+
+    // Transform to summaries if not requesting full data
+    if (options.include_full_data) {
+      return this.applyPagination(filteredTasks, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    } else {
+      const summaries = filteredTasks.map((task) =>
+        this.transformToSummary(task),
+      );
+      return this.applyPagination(summaries, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    }
   }
 
-  // Get tasks by status
+  // Get tasks by status (original method - deprecated, use getTasksByStatusPaginated)
   async getTasksByStatus(
     status: string,
     projectName?: string,
   ): Promise<TaskSearchResult[]> {
-    const tasks = await this.getTasks(projectName);
-    return tasks.filter((task) => task.status === status);
+    const result = await this.getTasksByStatusPaginated(
+      status,
+      {},
+      projectName,
+    );
+    return result.items as TaskSearchResult[];
   }
 
-  // Get tasks by priority
+  // Enhanced method to get tasks by status with pagination and summary support
+  async getTasksByStatusPaginated(
+    status: string,
+    options: PaginationOptions = {},
+    projectName?: string,
+  ): Promise<PaginatedResponse<TaskSummary | TaskSearchResult>> {
+    const tasksResult = await this.getTasksPaginated(
+      { include_full_data: true },
+      projectName,
+    );
+    const allTasks = tasksResult.items as TaskSearchResult[];
+
+    const filteredTasks = allTasks.filter((task) => task.status === status);
+
+    // Transform to summaries if not requesting full data
+    if (options.include_full_data) {
+      return this.applyPagination(filteredTasks, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    } else {
+      const summaries = filteredTasks.map((task) =>
+        this.transformToSummary(task),
+      );
+      return this.applyPagination(summaries, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    }
+  }
+
+  // Get tasks by priority (original method - deprecated, use getTasksByPriorityPaginated)
   async getTasksByPriority(
     priority: string,
     projectName?: string,
   ): Promise<TaskSearchResult[]> {
-    const tasks = await this.getTasks(projectName);
-    return tasks.filter((task) => task.priority === priority);
+    const result = await this.getTasksByPriorityPaginated(
+      priority,
+      {},
+      projectName,
+    );
+    return result.items as TaskSearchResult[];
   }
 
-  // Get tasks by order key (useful for finding tasks in sequence)
+  // Enhanced method to get tasks by priority with pagination and summary support
+  async getTasksByPriorityPaginated(
+    priority: string,
+    options: PaginationOptions = {},
+    projectName?: string,
+  ): Promise<PaginatedResponse<TaskSummary | TaskSearchResult>> {
+    const tasksResult = await this.getTasksPaginated(
+      { include_full_data: true },
+      projectName,
+    );
+    const allTasks = tasksResult.items as TaskSearchResult[];
+
+    const filteredTasks = allTasks.filter((task) => task.priority === priority);
+
+    // Transform to summaries if not requesting full data
+    if (options.include_full_data) {
+      return this.applyPagination(filteredTasks, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    } else {
+      const summaries = filteredTasks.map((task) =>
+        this.transformToSummary(task),
+      );
+      return this.applyPagination(summaries, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    }
+  }
+
+  // Get tasks by order key (original method - deprecated, use getTasksByOrderKeyPaginated)
   async getTasksByOrderKey(
     orderKey: string,
     projectName?: string,
   ): Promise<TaskSearchResult[]> {
-    const tasks = await this.getTasks(projectName);
-    return tasks.filter((task) => task.order_key === orderKey);
+    const result = await this.getTasksByOrderKeyPaginated(
+      orderKey,
+      {},
+      projectName,
+    );
+    return result.items as TaskSearchResult[];
+  }
+
+  // Enhanced method to get tasks by order key with pagination and summary support
+  async getTasksByOrderKeyPaginated(
+    orderKey: string,
+    options: PaginationOptions = {},
+    projectName?: string,
+  ): Promise<PaginatedResponse<TaskSummary | TaskSearchResult>> {
+    const tasksResult = await this.getTasksPaginated(
+      { include_full_data: true },
+      projectName,
+    );
+    const allTasks = tasksResult.items as TaskSearchResult[];
+
+    const filteredTasks = allTasks.filter(
+      (task) => task.order_key === orderKey,
+    );
+
+    // Transform to summaries if not requesting full data
+    if (options.include_full_data) {
+      return this.applyPagination(filteredTasks, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    } else {
+      const summaries = filteredTasks.map((task) =>
+        this.transformToSummary(task),
+      );
+      return this.applyPagination(summaries, options) as PaginatedResponse<
+        TaskSummary | TaskSearchResult
+      >;
+    }
   }
 
   // Get task dependencies - find all tasks that depend on a given task
@@ -455,15 +672,17 @@ export class SimpleTaskService {
     try {
       const tasks = await this.getTasks(projectName);
       if (tasks.length === 0) {
-        throw new Error("No tasks found in project to determine default user_id");
+        throw new Error(
+          "No tasks found in project to determine default user_id",
+        );
       }
-      
+
       // Use the created_by from the first task as default
       const defaultUserId = tasks[0].created_by;
       if (!defaultUserId) {
         throw new Error("Found tasks but no created_by field");
       }
-      
+
       return defaultUserId;
     } catch (error) {
       throw new Error(
@@ -485,15 +704,17 @@ export class SimpleTaskService {
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
-    
+
     // If user_id not provided, get it from the task creator
-    const user_id = args.user_id || await this.getTaskCreatorUserId(args.task_id, projectName);
-    
+    const user_id =
+      args.user_id ||
+      (await this.getTaskCreatorUserId(args.task_id, projectName));
+
     const commentArgs = {
       ...args,
       user_id,
     };
-    
+
     return this.makeRequest(
       `/projects/${projectConfig.projectId}/tasks/${args.task_id}/comments`,
       "POST",
@@ -509,10 +730,11 @@ export class SimpleTaskService {
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
-    
+
     // If user_id not provided, get it from the task creator
-    const resolvedUserId = user_id || await this.getTaskCreatorUserId(task_id, projectName);
-    
+    const resolvedUserId =
+      user_id || (await this.getTaskCreatorUserId(task_id, projectName));
+
     const queryParams = new URLSearchParams({
       user_id: resolvedUserId,
       ...options,
@@ -533,14 +755,18 @@ export class SimpleTaskService {
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
-    
+
     // If user_id not provided and we have task_id, get it from the task creator
-    const resolvedUserId = user_id || (task_id ? await this.getTaskCreatorUserId(task_id, projectName) : undefined);
-    
+    const resolvedUserId =
+      user_id ||
+      (task_id
+        ? await this.getTaskCreatorUserId(task_id, projectName)
+        : undefined);
+
     if (!resolvedUserId) {
       throw new Error("user_id is required when task_id is not provided");
     }
-    
+
     // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
     if (task_id) {
       return this.makeRequest(
@@ -572,14 +798,18 @@ export class SimpleTaskService {
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
-    
+
     // If user_id not provided and we have task_id, get it from the task creator
-    const resolvedUserId = user_id || (task_id ? await this.getTaskCreatorUserId(task_id, projectName) : undefined);
-    
+    const resolvedUserId =
+      user_id ||
+      (task_id
+        ? await this.getTaskCreatorUserId(task_id, projectName)
+        : undefined);
+
     if (!resolvedUserId) {
       throw new Error("user_id is required when task_id is not provided");
     }
-    
+
     // We need task_id for the correct endpoint, but we can try the comment-only endpoint as fallback
     if (task_id) {
       return this.makeRequest(
@@ -635,10 +865,11 @@ export class SimpleTaskService {
     if (!task_id) {
       throw new Error("task_id is required for creating comment replies");
     }
-    
+
     // If user_id not provided, get it from the task creator
-    const resolvedUserId = user_id || await this.getTaskCreatorUserId(task_id, projectName);
-    
+    const resolvedUserId =
+      user_id || (await this.getTaskCreatorUserId(task_id, projectName));
+
     return this.makeRequest(
       `/projects/${projectConfig.projectId}/tasks/${task_id}/comments`,
       "POST",
@@ -657,10 +888,11 @@ export class SimpleTaskService {
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
-    
+
     // If user_id not provided, get a default user_id
-    const resolvedUserId = user_id || await this.getDefaultUserId(projectName);
-    
+    const resolvedUserId =
+      user_id || (await this.getDefaultUserId(projectName));
+
     const queryParams = new URLSearchParams({ user_id: resolvedUserId });
     return this.makeRequest(
       `/projects/${projectConfig.projectId}/comments/${comment_id}/thread?${queryParams}`,
@@ -677,10 +909,11 @@ export class SimpleTaskService {
     projectName?: string,
   ): Promise<any> {
     const projectConfig = this.getProjectConfig(projectName);
-    
+
     // If user_id not provided, get a default user_id
-    const resolvedUserId = user_id || await this.getDefaultUserId(projectName);
-    
+    const resolvedUserId =
+      user_id || (await this.getDefaultUserId(projectName));
+
     const queryParams = new URLSearchParams({
       user_id: resolvedUserId,
       ...options,
@@ -696,10 +929,7 @@ export class SimpleTaskService {
   }
 
   // Process the checklist for a task
-  async processChecklist(
-    taskId: string,
-    projectName?: string
-  ): Promise<void> {
+  async processChecklist(taskId: string, projectName?: string): Promise<void> {
     const task = await this.getTask(taskId, projectName);
 
     if (!task.checklist || !Array.isArray(task.checklist)) {
@@ -735,10 +965,10 @@ export class SimpleTaskService {
     text: string,
     order?: number,
     completed: boolean = false,
-    projectName?: string
+    projectName?: string,
   ): Promise<TaskSearchResult> {
     const task = await this.getTask(taskId, projectName);
-    
+
     // Initialize checklist if it doesn't exist
     if (!task.checklist) {
       task.checklist = [];
@@ -746,20 +976,27 @@ export class SimpleTaskService {
 
     // Auto-assign order if not provided
     if (order === undefined) {
-      order = task.checklist.length > 0 ? Math.max(...task.checklist.map(item => item.order)) + 1 : 0;
+      order =
+        task.checklist.length > 0
+          ? Math.max(...task.checklist.map((item) => item.order)) + 1
+          : 0;
     }
 
     // Generate a new ID for the checklist item
     const newItem = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       text,
       order,
-      completed
+      completed,
     };
 
     task.checklist.push(newItem);
-    
-    return await this.updateTask(taskId, { checklist: task.checklist }, projectName);
+
+    return await this.updateTask(
+      taskId,
+      { checklist: task.checklist },
+      projectName,
+    );
   }
 
   // Update an existing checklist item
@@ -767,15 +1004,15 @@ export class SimpleTaskService {
     taskId: string,
     itemId: string,
     updates: { text?: string; order?: number; completed?: boolean },
-    projectName?: string
+    projectName?: string,
   ): Promise<TaskSearchResult> {
     const task = await this.getTask(taskId, projectName);
-    
+
     if (!task.checklist || !Array.isArray(task.checklist)) {
       throw new Error("Task has no checklist.");
     }
 
-    const itemIndex = task.checklist.findIndex(item => item.id === itemId);
+    const itemIndex = task.checklist.findIndex((item) => item.id === itemId);
     if (itemIndex === -1) {
       throw new Error(`Checklist item with ID ${itemId} not found.`);
     }
@@ -791,22 +1028,26 @@ export class SimpleTaskService {
       task.checklist[itemIndex].completed = updates.completed;
     }
 
-    return await this.updateTask(taskId, { checklist: task.checklist }, projectName);
+    return await this.updateTask(
+      taskId,
+      { checklist: task.checklist },
+      projectName,
+    );
   }
 
   // Remove an item from a task's checklist
   async removeChecklistItem(
     taskId: string,
     itemId: string,
-    projectName?: string
+    projectName?: string,
   ): Promise<TaskSearchResult> {
     const task = await this.getTask(taskId, projectName);
-    
+
     if (!task.checklist || !Array.isArray(task.checklist)) {
       throw new Error("Task has no checklist.");
     }
 
-    const itemIndex = task.checklist.findIndex(item => item.id === itemId);
+    const itemIndex = task.checklist.findIndex((item) => item.id === itemId);
     if (itemIndex === -1) {
       throw new Error(`Checklist item with ID ${itemId} not found.`);
     }
@@ -814,16 +1055,20 @@ export class SimpleTaskService {
     // Remove the item
     task.checklist.splice(itemIndex, 1);
 
-    return await this.updateTask(taskId, { checklist: task.checklist }, projectName);
+    return await this.updateTask(
+      taskId,
+      { checklist: task.checklist },
+      projectName,
+    );
   }
 
   // Get the checklist for a specific task
   async getChecklist(
     taskId: string,
-    projectName?: string
+    projectName?: string,
   ): Promise<ChecklistItem[]> {
     const task = await this.getTask(taskId, projectName);
-    
+
     if (!task.checklist) {
       return [];
     }

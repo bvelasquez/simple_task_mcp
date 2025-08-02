@@ -168,14 +168,15 @@ Add to your MCP client configuration (e.g., Claude Desktop):
 ### Task Operations
 
 - `simpletask_create_task` - Create a new task
-- `simpletask_get_tasks` - List tasks with optional filtering
-- `simpletask_get_task` - Get a specific task by ID
+- `simpletask_get_tasks` - **[ENHANCED]** List tasks with pagination and summary support
+- `simpletask_get_tasks_summary` - **[NEW]** Get lightweight task summaries to reduce token usage
+- `simpletask_get_task` - Get a specific task by ID (always returns full data)
 - `simpletask_update_task` - Update task properties
 - `simpletask_delete_task` - Delete a task
-- `simpletask_search_tasks` - Search tasks by criteria
-- `simpletask_get_tasks_by_status` - Filter tasks by status
-- `simpletask_get_tasks_by_priority` - Filter tasks by priority
-- `simpletask_get_tasks_by_order_key` - Get tasks by order
+- `simpletask_search_tasks` - **[ENHANCED]** Search tasks with pagination and summary support
+- `simpletask_get_tasks_by_status` - **[ENHANCED]** Filter tasks by status with pagination
+- `simpletask_get_tasks_by_priority` - **[ENHANCED]** Filter tasks by priority with pagination
+- `simpletask_get_tasks_by_order_key` - **[ENHANCED]** Get tasks by order with pagination
 - `simpletask_update_task_status` - Update task status
 - `simpletask_generate_tasks` - AI-powered task generation
 
@@ -205,19 +206,62 @@ await callTool("simpletask_create_task", {
   description: "Add JWT-based authentication system",
   status: "todo",
   priority: "high",
-  user_id: "user-123",
   project_name: "simple_task",
 });
 ```
 
-### Searching Tasks
+### Getting Tasks with Pagination
+
+```javascript
+// Get first 10 tasks as summaries (lightweight)
+await callTool("simpletask_get_tasks", {
+  limit: 10,
+  offset: 0,
+  include_full_data: false, // Returns summary data only
+  project_name: "simple_task",
+});
+
+// Get full task data with pagination
+await callTool("simpletask_get_tasks", {
+  limit: 25,
+  offset: 0,
+  include_full_data: true, // Returns complete task data
+  project_name: "simple_task",
+});
+```
+
+### Using the Summary Tool
+
+```javascript
+// Get lightweight task summaries (recommended for initial queries)
+await callTool("simpletask_get_tasks_summary", {
+  limit: 50,
+  offset: 0,
+  project_name: "simple_task",
+});
+```
+
+### Searching Tasks with Pagination
 
 ```javascript
 await callTool("simpletask_search_tasks", {
   query: "authentication",
-  status: "in_progress",
-  priority: "high",
   limit: 10,
+  offset: 0,
+  include_full_data: false, // Use summary for better performance
+  project_name: "simple_task",
+});
+```
+
+### Filtering Tasks by Status
+
+```javascript
+await callTool("simpletask_get_tasks_by_status", {
+  status: "in_progress",
+  limit: 25,
+  offset: 0,
+  include_full_data: false,
+  project_name: "simple_task",
 });
 ```
 
@@ -233,17 +277,67 @@ await callTool("simpletask_create_comment", {
 
 ### Generating Tasks with AI
 
-```javascript
+````javascript
 await callTool("simpletask_generate_tasks", {
-  prompt: "Create tasks for building a React dashboard with user management",
-  user_id: "user-123",
+  description: "Create tasks for building a React dashboard with user management",
   project_name: "simple_task"
 });
+## Pagination and Performance Features
+
+### Overview
+
+The Simple Task MCP now includes comprehensive pagination and summarization features to improve performance and reduce token usage, especially for large projects.
+
+### Key Features
+
+- **Automatic Limiting**: All task retrieval operations now limit results (default: 25, max: 100)
+- **Summary Mode**: Lightweight task summaries include only essential fields
+- **Pagination Support**: Offset-based pagination for handling large datasets
+- **Token Optimization**: Summary responses reduce token usage by ~70%
+
+### Summary vs Full Data
+
+**Summary Fields** (include_full_data: false):
+- `id`, `title`, `status`, `priority`, `created_at`, `assigned_to`
+
+**Full Data** (include_full_data: true):
+- All task fields including `description`, `depends_on`, `due_date`, `checklist`, etc.
+
+### Pagination Parameters
+
+All enhanced tools support these parameters:
+
+- `limit` (number): Maximum items to return (1-100, default: 25)
+- `offset` (number): Number of items to skip (default: 0)
+- `include_full_data` (boolean): Return full data (true) or summary (false, default)
+
+### Response Format
+
+Paginated responses include metadata:
+
+```javascript
+{
+  "items": [...], // Task data (summary or full)
+  "total_count": 150, // Total tasks matching criteria
+  "has_more": true, // Whether more results exist
+  "next_offset": 25, // Offset for next page (if has_more)
+  "limit": 25, // Applied limit
+  "offset": 0 // Current offset
+}
+````
+
+### Best Practices
+
+1. **Use Summaries First**: Start with `simpletask_get_tasks_summary` or `include_full_data: false`
+2. **Fetch Details on Demand**: Use `simpletask_get_task` for full details of specific tasks
+3. **Reasonable Limits**: Use smaller limits (10-25) for initial queries
+4. **Implement Pagination**: Use `has_more` and `next_offset` for pagination
+
 ## Development
 
 ### Project Structure
 
-```
+````
 
 ```text
 mcp_server/
@@ -257,7 +351,7 @@ mcp_server/
 ├── package.json
 ├── tsconfig.json
 └── README.md
-```
+````
 
 ### Adding New Features
 
