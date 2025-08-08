@@ -250,7 +250,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       "Always validate inputSchema before executing any tool.",
       "Limit any AI-generated lists (e.g., tasks or subtasks) to 10 items max.",
       "Check task comments and description for context before implementing features or changes.",
-      "If a task seems too complex, suggest breaking it down into smaller tasks.",
+      "If a task seems too complex, suggest breaking it down into smaller check lists items.",
       "Check the description field of tasks for additional context or requirements.",
       "Check comments on the task for additional context or requirements.",
       "Leave comments on tasks to clarify intent or ask for more details.",
