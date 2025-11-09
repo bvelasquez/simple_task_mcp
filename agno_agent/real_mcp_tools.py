@@ -23,7 +23,10 @@ def call_mcp_tool(tool_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Tool result as dictionary
     """
-    mcp_server_path = os.getenv("MCP_SERVER_PATH", "/Users/barryvelasquez/projects/simple_task_mcp/mcp_server/build")
+    # Get the script directory and construct the MCP server path relative to it
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_mcp_path = os.path.join(script_dir, "..", "mcp_server", "build")
+    mcp_server_path = os.getenv("MCP_SERVER_PATH", default_mcp_path)
     
     # Create a temporary script to call the MCP server
     script_content = f"""

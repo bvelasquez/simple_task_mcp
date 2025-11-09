@@ -179,8 +179,6 @@ class RealSimpleTaskAgent:
                 Data Source: Live aitistra.com API via MCP Server\
             """),
             markdown=True,
-            show_tool_calls=debug,
-            add_datetime_to_instructions=True,
             debug_mode=debug,
         )
     
@@ -274,7 +272,10 @@ def get_available_projects():
     """Get list of available projects from projects.json"""
     import json
     
-    projects_file = "/Users/barryvelasquez/projects/simple_task_mcp/mcp_server/projects.json"
+    # Get the script directory and construct the projects.json path relative to it
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    projects_file = os.path.join(script_dir, "..", "mcp_server", "projects.json")
+    
     try:
         with open(projects_file, 'r') as f:
             projects = json.load(f)
