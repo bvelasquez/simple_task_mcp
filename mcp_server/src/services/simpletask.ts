@@ -34,7 +34,7 @@ export interface Task {
   id?: string;
   title: string;
   description: string;
-  priority?: "low" | "medium" | "high";
+  priority?: "urgent" | "high" | "medium" | "low";
   status?: "todo" | "in_progress" | "review" | "completed" | "blocked";
   order_key?: string;
   depends_on?: string[];
@@ -66,7 +66,7 @@ export interface TaskSummary {
   id: string;
   title: string;
   status: "todo" | "in_progress" | "review" | "completed" | "blocked";
-  priority: "low" | "medium" | "high";
+  priority: "urgent" | "high" | "medium" | "low";
   created_at: string;
   assigned_to: string | null;
 }

@@ -354,7 +354,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             priority: {
               type: "string",
-              enum: ["low", "medium", "high"],
+              enum: ["urgent", "high", "medium", "low"],
               description: "Task priority",
               default: "medium",
             },
@@ -486,7 +486,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             priority: {
               type: "string",
-              enum: ["low", "medium", "high"],
+              enum: ["urgent", "high", "medium", "low"],
               description: "New task priority",
             },
             status: {
@@ -642,7 +642,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             priority: {
               type: "string",
-              enum: ["low", "medium", "high"],
+              enum: ["urgent", "high", "medium", "low"],
               description: "Priority to filter by",
             },
             project_name: {
