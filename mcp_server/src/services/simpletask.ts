@@ -122,8 +122,8 @@ export class SimpleTaskService {
           apiKey: project.apiKey,
           projectId: project.projectId,
         };
-        console.log(
-          `📋 Configured project: ${project.projectName} (${project.name})`
+        console.error(
+          `📋 Configured project: ${project.projectName} (${project.name})`,
         );
       });
 
@@ -131,14 +131,15 @@ export class SimpleTaskService {
       const firstProject = projectDefinitions[0];
       const config: SimpleTaskConfig = {
         apiKey: defaultConfig?.apiKey || firstProject.apiKey,
+        // Firebase public API endpoint for Simple Task
         baseUrl:
           defaultConfig?.baseUrl ||
-          "https://apiv1-5kr4fylsmq-uc.a.run.app/api-v1",
+          "https://us-central1-aitistra.cloudfunctions.net/publicApi",
         projectId: defaultConfig?.projectId || firstProject.projectId,
       };
 
-      console.log(
-        `📋 Using default project: ${firstProject.projectName} (${firstProject.name})`
+      console.error(
+        `📋 Using default project: ${firstProject.projectName} (${firstProject.name})`,
       );
       return new SimpleTaskService(config, projects, projectDefinitions);
     } catch (error) {
@@ -945,7 +946,7 @@ export class SimpleTaskService {
       }
 
       // Suggest how to complete the item or ask for clarification
-      console.log(`Processing checklist item: ${item.text}`);
+      console.error(`Processing checklist item: ${item.text}`);
       // TODO: Add AI logic to suggest or ask for clarification
 
       // Mark the item as completed

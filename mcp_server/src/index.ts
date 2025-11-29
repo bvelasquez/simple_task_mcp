@@ -14,7 +14,7 @@ import { SimpleTaskService } from "./services/simpletask.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log("🚀 Simple Task MCP Server starting");
+console.error("🚀 Simple Task MCP Server starting");
 
 // Initialize Simple Task service with JSON configuration only
 const simpleTaskService = SimpleTaskService.fromProjectsJson(
@@ -63,7 +63,7 @@ async function detectProjectFromWorkspace(): Promise<string | null> {
               sessionContext.currentProject = matchedProject.projectName;
               sessionContext.detectedFromWorkspace = true;
               sessionContext.lastWorkspaceDetection = now;
-              console.log(
+              console.error(
                 `🔍 Auto-detected project: ${matchedProject.name} (${matchedProject.projectName})`,
               );
               return matchedProject.projectName;
@@ -141,7 +141,7 @@ async function resolveProjectContext(
   // 5. Fall back to default project (single project case)
   const defaultProject = projects[0];
   if (defaultProject) {
-    console.log(
+    console.error(
       `📌 Using default project: ${defaultProject.name} (${defaultProject.projectName})`,
     );
     return defaultProject.projectName;
@@ -189,7 +189,7 @@ function switchToProject(projectIdentifier: string): {
   if (project) {
     sessionContext.currentProject = project.projectName;
     sessionContext.detectedFromWorkspace = false;
-    console.log(
+    console.error(
       `🔄 Switched to project: ${project.name} (${project.projectName})`,
     );
     return {
@@ -210,23 +210,23 @@ function switchToProject(projectIdentifier: string): {
 
 // Log project information for context
 const allProjects = simpleTaskService.getAllProjects();
-console.log(`📋 Loaded ${allProjects.length} project(s):`);
+console.error(`📋 Loaded ${allProjects.length} project(s):`);
 allProjects.forEach((project, index) => {
   const isDefault = index === 0;
-  console.log(
+  console.error(
     `   ${index + 1}. ${project.name} (${project.projectName})${
       isDefault ? " [DEFAULT]" : ""
     }`,
   );
 });
-console.log("");
+console.error("");
 
 // Initialize workspace detection
 detectProjectFromWorkspace().then((detected) => {
   if (detected) {
-    console.log(`🎯 Using auto-detected project: ${detected}`);
+    console.error(`🎯 Using auto-detected project: ${detected}`);
   } else {
-    console.log(`📌 Using default project: ${allProjects[0]?.name || "none"}`);
+    console.error(`📌 Using default project: ${allProjects[0]?.name || "none"}`);
   }
 });
 
@@ -1426,7 +1426,7 @@ async function handleSimpleTaskCreateTask(args: any) {
     );
 
     // Log the project used for context
-    console.log(`📝 Created task in project: ${resolvedProject}`);
+    console.error(`📝 Created task in project: ${resolvedProject}`);
 
     return {
       content: [
@@ -1466,7 +1466,7 @@ async function handleSimpleTaskGetTasks(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `📋 Retrieved tasks from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
@@ -1508,7 +1508,7 @@ async function handleSimpleTaskGetTasksSummary(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `📋 Retrieved task summaries from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
@@ -1547,7 +1547,7 @@ async function handleSimpleTaskGetTask(args: any) {
     const result = await simpleTaskService.getTask(task_id, resolvedProject);
 
     // Log the project used for context
-    console.log(`📄 Retrieved task from project: ${resolvedProject}`);
+    console.error(`📄 Retrieved task from project: ${resolvedProject}`);
 
     return {
       content: [
@@ -1588,7 +1588,7 @@ async function handleSimpleTaskUpdateTask(args: any) {
     );
 
     // Log the project used for context
-    console.log(`✏️ Updated task in project: ${resolvedProject}`);
+    console.error(`✏️ Updated task in project: ${resolvedProject}`);
 
     return {
       content: [
@@ -1629,7 +1629,7 @@ async function handleSimpleTaskUpdateTaskStatus(args: any) {
     );
 
     // Log the project used for context
-    console.log(`🔄 Updated task status in project: ${resolvedProject}`);
+    console.error(`🔄 Updated task status in project: ${resolvedProject}`);
 
     return {
       content: [
@@ -1666,7 +1666,7 @@ async function handleSimpleTaskDeleteTask(args: any) {
     const result = await simpleTaskService.deleteTask(task_id, resolvedProject);
 
     // Log the project used for context
-    console.log(`🗑️ Deleted task from project: ${resolvedProject}`);
+    console.error(`🗑️ Deleted task from project: ${resolvedProject}`);
 
     return {
       content: [
@@ -1707,7 +1707,7 @@ async function handleSimpleTaskSearchTasks(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `🔍 Searched tasks in project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
@@ -1750,7 +1750,7 @@ async function handleSimpleTaskGetTasksByStatus(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `📊 Retrieved tasks by status from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
@@ -1793,7 +1793,7 @@ async function handleSimpleTaskGetTasksByPriority(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `🔢 Retrieved tasks by priority from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
@@ -1836,7 +1836,7 @@ async function handleSimpleTaskGetTasksByOrderKey(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `📝 Retrieved tasks by order key from project: ${resolvedProject} (${result.items.length}/${result.total_count})`,
     );
 
@@ -1878,7 +1878,7 @@ async function handleSimpleTaskGetTaskDependencies(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `🔗 Retrieved task dependencies from project: ${resolvedProject}`,
     );
 
@@ -1920,7 +1920,7 @@ async function handleSimpleTaskGetTaskDependents(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `🔗 Retrieved task dependents from project: ${resolvedProject}`,
     );
 
@@ -1962,7 +1962,7 @@ async function handleSimpleTaskGenerateTasks(args: any) {
     );
 
     // Log the project used for context
-    console.log(`🤖 Generated tasks for project: ${resolvedProject}`);
+    console.error(`🤖 Generated tasks for project: ${resolvedProject}`);
 
     return {
       content: [
@@ -2433,7 +2433,7 @@ async function handleSimpleTaskAddChecklistItem(args: any) {
     );
 
     // Log the project used for context
-    console.log(
+    console.error(
       `✅ Added checklist item to task in project: ${resolvedProject}`,
     );
 
@@ -2601,7 +2601,7 @@ async function handleSimpleTaskGetChecklist(args: any) {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.log("✅ Simple Task MCP Server running on stdio");
+  console.error("✅ Simple Task MCP Server running on stdio");
 }
 
 main().catch((error) => {

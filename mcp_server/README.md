@@ -362,10 +362,10 @@ mcp_server/
 
 ### API Integration
 
-The server integrates with Simple Task's REST API:
+The server integrates with Simple Task's public REST API:
 
-- **Base URL**: `https://api.simpletask.app/api/v1` (configurable)
-- **Authentication**: Bearer token using project API keys
+- **Base URL**: `https://us-central1-aitistra.cloudfunctions.net/publicApi` (configurable via projects.json)
+- **Authentication**: Bearer token using project API keys (sent as `Authorization: Bearer <API_KEY>`)
 - **Response Format**: JSON with consistent error handling
 
 ### Error Handling
@@ -434,23 +434,6 @@ DEBUG=* npm run dev
 ## License
 
 This project is licensed under the MIT License.
-});
-
-// Run a query
-await callTool("supabase_query", {
-query: "SELECT \* FROM users WHERE email = $1",
-params: ["user@example.com"],
-});
-
-// Run a migration
-await callTool("supabase_run_migration", {
-migration_sql: "ALTER TABLE users ADD COLUMN last_login TIMESTAMP;",
-description: "Add last_login column to users table",
-});
-
-````
-
-#### Stripe Operations
 
 ```javascript
 // List customers
@@ -507,9 +490,7 @@ mcp_server/
 ├── src/
 │   ├── index.ts              # Main server entry point
 │   └── services/
-│       ├── supabase.ts       # Database operations
-│       ├── stripe.ts         # Payment operations
-│       └── sendgrid.ts       # Email operations
+│       └── simpletask.ts     # Simple Task API operations
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -557,11 +538,11 @@ This MCP server is designed specifically for the EduAxios project and includes:
 
 ### Common Issues
 
-1. **Database Connection Issues**
+1. **API Connection Issues**
 
-   - Verify `SUPABASE_DB_URL` is correct
+   - Verify your Firebase API endpoint is accessible
    - Check network connectivity
-   - Ensure SSL settings are correct
+   - Ensure API keys are correct
 
 2. **Stripe API Issues**
 
