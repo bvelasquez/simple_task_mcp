@@ -91,15 +91,18 @@ export class SimpleTaskService {
   private config: SimpleTaskConfig;
   private projects: ProjectConfig;
   private projectDefinitions: ProjectDefinition[];
+  private projectsJsonPath: string;
 
   constructor(
     config: SimpleTaskConfig,
     projects: ProjectConfig = {},
-    projectDefinitions: ProjectDefinition[] = []
+    projectDefinitions: ProjectDefinition[] = [],
+    projectsJsonPath: string = ""
   ) {
     this.config = config;
     this.projects = projects;
     this.projectDefinitions = projectDefinitions;
+    this.projectsJsonPath = projectsJsonPath;
   }
 
   // Static method to create service from JSON configuration
@@ -141,7 +144,7 @@ export class SimpleTaskService {
       console.error(
         `📋 Using default project: ${firstProject.projectName} (${firstProject.name})`,
       );
-      return new SimpleTaskService(config, projects, projectDefinitions);
+      return new SimpleTaskService(config, projects, projectDefinitions, projectsJsonPath);
     } catch (error) {
       console.error(
         `Failed to load projects from JSON: ${
@@ -152,12 +155,56 @@ export class SimpleTaskService {
     }
   }
 
+  // Reload projects from JSON file
+  private reloadProjects(): void {
+    if (!this.projectsJsonPath) {
+      return; // Can't reload if we don't have the path
+    }
+
+    try {
+      const projectDefinitions: ProjectDefinition[] = JSON.parse(
+        fs.readFileSync(this.projectsJsonPath, "utf8")
+      );
+
+      if (projectDefinitions.length === 0) {
+        console.warn("No projects found in projects.json after reload");
+        return;
+      }
+
+      const projects: ProjectConfig = {};
+      projectDefinitions.forEach((project) => {
+        projects[project.projectName] = {
+          apiKey: project.apiKey,
+          projectId: project.projectId,
+        };
+      });
+
+      // Update the first project as default if it changed
+      const firstProject = projectDefinitions[0];
+      this.config.apiKey = firstProject.apiKey;
+      this.config.projectId = firstProject.projectId;
+
+      this.projects = projects;
+      this.projectDefinitions = projectDefinitions;
+    } catch (error) {
+      console.error(
+        `Failed to reload projects from JSON: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      // Don't throw - keep using existing data if reload fails
+    }
+  }
+
   // Get project configuration by name, fallback to default
   private getProjectConfig(projectName?: string): {
     apiKey: string;
     projectId: string;
     baseUrl: string;
   } {
+    // Reload projects to ensure we have the latest data
+    this.reloadProjects();
+
     if (projectName && this.projects[projectName]) {
       return {
         ...this.projects[projectName],
@@ -174,11 +221,15 @@ export class SimpleTaskService {
 
   // Get all available projects with their details
   getAllProjects(): ProjectDefinition[] {
+    // Reload projects to ensure we have the latest data
+    this.reloadProjects();
     return this.projectDefinitions;
   }
 
   // Get project details by project name
   getProjectDetails(projectName: string): ProjectDefinition | null {
+    // Reload projects to ensure we have the latest data
+    this.reloadProjects();
     return (
       this.projectDefinitions.find((p) => p.projectName === projectName) || null
     );
@@ -186,6 +237,8 @@ export class SimpleTaskService {
 
   // Get the default project
   getDefaultProject(): ProjectDefinition | null {
+    // Reload projects to ensure we have the latest data
+    this.reloadProjects();
     return this.projectDefinitions.length > 0
       ? this.projectDefinitions[0]
       : null;
@@ -193,6 +246,8 @@ export class SimpleTaskService {
 
   // Find project by partial name match or description
   findProject(query: string): ProjectDefinition[] {
+    // Reload projects to ensure we have the latest data
+    this.reloadProjects();
     const searchTerm = query.toLowerCase();
     return this.projectDefinitions.filter(
       (project) =>
@@ -205,6 +260,9 @@ export class SimpleTaskService {
 
   // Get project summary for AI context
   getProjectsSummary(): string {
+    // Reload projects to ensure we have the latest data
+    this.reloadProjects();
+    
     if (this.projectDefinitions.length === 0) {
       return "No projects configured.";
     }
@@ -641,6 +699,8 @@ export class SimpleTaskService {
 
   // List available projects
   listProjects(): string[] {
+    // Reload projects to ensure we have the latest data
+    this.reloadProjects();
     const projectNames = Object.keys(this.projects);
     if (this.config.apiKey && this.config.projectId) {
       projectNames.unshift("default");
